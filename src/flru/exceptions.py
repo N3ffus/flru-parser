@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 
 class FLRUError(Exception):
     """Base package exception."""
@@ -26,6 +28,17 @@ class RateLimitedError(HTTPStatusError):
 
 class BlockedError(TransportError):
     """A CAPTCHA, anti-bot page, or access block was detected."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        debug_path: Path | None = None,
+    ) -> None:
+        self.status_code = status_code
+        self.debug_path = debug_path
+        super().__init__(message)
 
 
 class AuthenticationRequired(TransportError):

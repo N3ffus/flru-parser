@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import email.utils
+import json
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin, urlsplit
 
@@ -22,17 +24,42 @@ from .proxy import ProxyPool, ProxyState
 from .resilience import AsyncRateLimiter, CircuitBreakerRegistry, RetryBudget
 from .security import validate_url
 
-_BLOCK_MARKERS = (
-    "captcha",
-    "подтвердите, что вы не робот",
-    "доступ временно ограничен",
-    "cloudflare",
+_STRONG_BLOCK_MARKERS = (
+    "g-recaptcha",
+    "hcaptcha",
+    "captcha-container",
+    "cf-chl-",
+    "challenge-platform",
+    "<title>access denied",
+    "<title>доступ ограничен",
 )
 _AUTH_MARKERS = (
     "необходимо авторизоваться",
     "войдите в аккаунт",
 )
 _REDIRECT_CODES = {301, 302, 303, 307, 308}
+
+
+def _dump_blocked_response(response: httpx.Response) -> Path:
+    """Persist a blocked response without serializing request credentials."""
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    directory = Path(".flru-debug") / f"blocked-{timestamp}"
+    directory.mkdir(parents=True, exist_ok=True)
+
+    (directory / "response.html").write_bytes(response.content)
+    sensitive_headers = {"authorization", "cookie", "set-cookie", "proxy-authorization"}
+    safe_headers = {
+        key: value for key, value in response.headers.items() if key.lower() not in sensitive_headers
+    }
+    metadata = {
+        "status_code": response.status_code,
+        "url": str(response.url),
+        "headers": safe_headers,
+    }
+    (directory / "metadata.json").write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return directory
 
 
 class ResilientTransport:
@@ -145,7 +172,17 @@ class ResilientTransport:
                     bytes_received=len(response.content),
                     latency_seconds_total=elapsed,
                 )
-                self._detect_block(response)
+                try:
+                    self._detect_block(response)
+                except BlockedError as exc:
+                    debug_directory = _dump_blocked_response(response)
+                    raise BlockedError(
+                        f"{exc}. Response saved to {debug_directory}",
+                        status_code=response.status_code,
+                        debug_path=debug_directory,
+                    ) from exc
+
+                self._persist_response_cookies(response)
 
                 if response.status_code in self.config.retry.retry_statuses:
                     if response.status_code == 429:
@@ -191,7 +228,6 @@ class ResilientTransport:
                     raise
                 await self._proxy_pool.failure(proxy_state, exc)
             except BlockedError as exc:
-                last_error = exc
                 await self.metrics.mutate(endpoint=endpoint, blocked_total=1, failures_total=1)
                 await self._proxy_pool.failure(proxy_state, exc)
                 await self._emit(
@@ -206,6 +242,8 @@ class ResilientTransport:
                         error=type(exc).__name__,
                     )
                 )
+                await circuit.record_failure()
+                raise
             except httpx.TransportError as exc:
                 last_error = exc
                 await self.metrics.mutate(endpoint=endpoint, failures_total=1)
@@ -320,7 +358,7 @@ class ResilientTransport:
             self.config.retry.max_delay,
             self.config.retry.base_delay * (2 ** (attempt - 1)),
         )
-        return exponential + random.uniform(0, self.config.retry.jitter)
+        return float(exponential + random.uniform(0, self.config.retry.jitter))
 
     def _retry_after(self, response: httpx.Response) -> float | None:
         return self._parse_retry_after(response.headers.get("Retry-After"))
@@ -335,8 +373,8 @@ class ResilientTransport:
             try:
                 parsed = email.utils.parsedate_to_datetime(value)
                 if parsed.tzinfo is None:
-                    parsed = parsed.replace(tzinfo=timezone.utc)
-                return max(0.0, (parsed - datetime.now(timezone.utc)).total_seconds())
+                    parsed = parsed.replace(tzinfo=UTC)
+                return max(0.0, (parsed - datetime.now(UTC)).total_seconds())
             except (TypeError, ValueError):
                 return None
 
@@ -344,10 +382,24 @@ class ResilientTransport:
         if not self.config.detect_blocks:
             return
         sample = response.text[:200_000].casefold()
-        if any(marker in sample for marker in _BLOCK_MARKERS):
+        marker_count = sum(marker in sample for marker in _STRONG_BLOCK_MARKERS)
+        suspicious_status = response.status_code in {403, 429, 503}
+        redirected_to_challenge = any(
+            part in str(response.url).casefold() for part in ("captcha", "challenge", "blocked")
+        )
+        if redirected_to_challenge or marker_count >= 2:
             raise BlockedError(f"Anti-bot or CAPTCHA page detected at {response.url}")
+        if suspicious_status and marker_count >= 1:
+            raise BlockedError(
+                f"Possible anti-bot response ({response.status_code}) at {response.url}"
+            )
         if any(marker in sample for marker in _AUTH_MARKERS):
             raise AuthenticationRequired(f"Authentication is required for {response.url}")
+
+    def _persist_response_cookies(self, response: httpx.Response) -> None:
+        cookies = dict(response.cookies)
+        if cookies:
+            self.update_cookies(cookies)
 
     def update_cookies(self, cookies: dict[str, str]) -> None:
         self._cookies.update(cookies)

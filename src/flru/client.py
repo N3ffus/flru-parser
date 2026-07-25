@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 import email.utils
 import re
-from collections.abc import AsyncIterable, AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Iterable, Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Self, cast
+from typing import Any, Self, TypeVar, cast
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 
 import httpx
@@ -15,7 +15,13 @@ from bs4 import BeautifulSoup
 from .batch import BatchError, BatchResult
 from .config import ClientConfig
 from .cookies import load_netscape_cookies
-from .exceptions import EmptyPageError, ParseError, RobotsDeniedError, SelectorDriftError
+from .exceptions import (
+    BlockedError,
+    EmptyPageError,
+    ParseError,
+    RobotsDeniedError,
+    SelectorDriftError,
+)
 from .filters import ProjectFilters
 from .models import (
     Category,
@@ -43,6 +49,26 @@ from .parsers import (
 from .robots import RobotsPolicy
 from .state import CrawlStateStore, record_for
 from .transport import ResilientTransport
+
+T = TypeVar("T")
+
+
+async def _gather_batch_or_stop_on_block(
+    awaitables: Iterable[Awaitable[T]],
+) -> list[T | BaseException]:
+    """Cancel outstanding work when a block makes further scraping inappropriate."""
+    tasks = [asyncio.ensure_future(awaitable) for awaitable in awaitables]
+    if not tasks:
+        return []
+    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+    for task in done:
+        error = task.exception()
+        if isinstance(error, BlockedError):
+            for pending_task in pending:
+                pending_task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+            raise error
+    return list(await asyncio.gather(*tasks, return_exceptions=True))
 
 
 class FLClient:
@@ -216,15 +242,17 @@ class FLClient:
                     params=params,
                 )
 
-        values = await asyncio.gather(*(load(page) for page in page_numbers), return_exceptions=True)
+        values = await _gather_batch_or_stop_on_block(load(page) for page in page_numbers)
         result: BatchResult[int, ProjectPage] = BatchResult()
         for page, value in zip(page_numbers, values, strict=True):
             if isinstance(value, asyncio.CancelledError):
                 raise value
+            if isinstance(value, BlockedError):
+                raise value
             if isinstance(value, Exception):
                 result.failed.append(BatchError(page, value))
             else:
-                result.successful.append(value)
+                result.successful.append(cast(ProjectPage, value))
         return result
 
     async def get_projects_batch(
@@ -461,15 +489,17 @@ class FLClient:
             async with semaphore:
                 return await self.get_freelancers_page(page, category=category)
 
-        values = await asyncio.gather(*(load(page) for page in page_numbers), return_exceptions=True)
+        values = await _gather_batch_or_stop_on_block(load(page) for page in page_numbers)
         result: BatchResult[int, FreelancerPage] = BatchResult()
         for page, value in zip(page_numbers, values, strict=True):
             if isinstance(value, asyncio.CancelledError):
                 raise value
+            if isinstance(value, BlockedError):
+                raise value
             if isinstance(value, Exception):
                 result.failed.append(BatchError(page, value))
             else:
-                result.successful.append(value)
+                result.successful.append(cast(FreelancerPage, value))
         return result
 
     async def get_freelancers_batch(
@@ -555,16 +585,18 @@ class FLClient:
             async with semaphore:
                 return await self.get_project(value)
 
-        values = await asyncio.gather(*(load(project) for project in projects), return_exceptions=True)
+        values = await _gather_batch_or_stop_on_block(load(project) for project in projects)
         result: BatchResult[int | str, ProjectDetail] = BatchResult()
         for project, value in zip(projects, values, strict=True):
             key: int | str = project.id if isinstance(project, ProjectSummary) else project
             if isinstance(value, asyncio.CancelledError):
                 raise value
+            if isinstance(value, BlockedError):
+                raise value
             if isinstance(value, Exception):
                 result.failed.append(BatchError(key, value))
             else:
-                result.successful.append(value)
+                result.successful.append(cast(ProjectDetail, value))
         return result
 
     async def get_project_details(

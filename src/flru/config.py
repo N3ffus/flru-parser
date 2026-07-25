@@ -33,7 +33,7 @@ class RateLimitConfig:
     requests_per_second: float = 1.0
     burst: int = 2
     max_concurrency: int = 5
-    min_interval: float = 0.0
+    min_interval: float = 0.5
     interval_jitter: float = 0.15
 
 
@@ -101,6 +101,8 @@ class ClientConfig:
             raise ConfigurationError("requests_per_second must be positive")
         if self.rate_limit.max_concurrency <= 0:
             raise ConfigurationError("max_concurrency must be positive")
+        if self.rate_limit.min_interval < 0:
+            raise ConfigurationError("min_interval must not be negative")
         if self.retry.max_attempts <= 0:
             raise ConfigurationError("max_attempts must be positive")
         if self.retry.total_timeout <= 0:

@@ -285,8 +285,10 @@ See [docs/SIMPLE_API.md](docs/SIMPLE_API.md) for the complete high-level API and
 - Unclassified empty pages raise `EmptyPageError`.
 - A recognized end page contains the `catalog_end` diagnostic warning.
 - HTTP 429 can pause all concurrent workers through a shared cooldown.
+- HTTP 429 and 503 honor `Retry-After` when the server supplies it.
 - Circuit breakers are scoped by endpoint and proxy by default.
-- CAPTCHA and block pages are detected, not bypassed.
+- CAPTCHA and block pages are detected, not bypassed or retried. Their HTML and sanitized response
+  metadata are saved to `.flru-debug/blocked-.../`; this directory is ignored by Git.
 - Requests are restricted to allowed FL.ru hosts and safe redirects.
 
 ## Observability
@@ -317,7 +319,7 @@ Install `flru-parser[observability]` before using these adapters.
 
 | Exception | Meaning |
 |---|---|
-| `BlockedError` | CAPTCHA, anti-bot or access-block page detected |
+| `BlockedError` | CAPTCHA, anti-bot or access-block page detected; exposes `status_code` and `debug_path` |
 | `AuthenticationRequired` | Authenticated cookies are required |
 | `RateLimitedError` | HTTP 429 after retry policy exhaustion |
 | `CircuitOpenError` | A scoped circuit breaker is open |

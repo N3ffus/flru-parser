@@ -7,6 +7,7 @@ import pytest
 
 from flru import ClientConfig, FLClient, RateLimitConfig, RetryConfig
 from flru.exceptions import AuthenticationRequired, BlockedError, HTTPStatusError, SecurityError
+from flru.client import _gather_batch_or_stop_on_block
 from flru.security import redact_url, validate_url
 
 
@@ -44,13 +45,19 @@ async def test_safe_redirect_and_external_redirect_rejected() -> None:
 
 
 @pytest.mark.asyncio
-async def test_block_auth_status_and_event_handler_failure() -> None:
+async def test_block_auth_status_and_event_handler_failure(tmp_path, monkeypatch) -> None:
     paths: list[str] = []
+    monkeypatch.chdir(tmp_path)
 
     async def handler(request: httpx.Request) -> httpx.Response:
         paths.append(request.url.path)
         if request.url.path == "/blocked":
-            return httpx.Response(200, text="Подтвердите, что вы не робот", request=request)
+            return httpx.Response(
+                403,
+                text="<html><title>Access denied</title><div class='g-recaptcha'></div></html>",
+                headers={"Set-Cookie": "session=secret", "X-Debug": "safe"},
+                request=request,
+            )
         if request.url.path == "/auth":
             return httpx.Response(401, request=request)
         return httpx.Response(404, request=request)
@@ -59,13 +66,37 @@ async def test_block_auth_status_and_event_handler_failure() -> None:
         raise RuntimeError("event failed")
 
     async with FLClient(config(), transport=httpx.MockTransport(handler), event_handler=broken_event) as client:
-        with pytest.raises(BlockedError):
+        with pytest.raises(BlockedError) as blocked:
             await client.get_html("/blocked")
         with pytest.raises(AuthenticationRequired):
             await client.get_html("/auth")
         with pytest.raises(HTTPStatusError):
             await client.get_html("/not-found")
         assert (await client.metrics()).event_handler_failures_total > 0
+
+    assert blocked.value.status_code == 403
+    assert blocked.value.debug_path is not None
+    assert (blocked.value.debug_path / "response.html").read_text() == (
+        "<html><title>Access denied</title><div class='g-recaptcha'></div></html>"
+    )
+    metadata = (blocked.value.debug_path / "metadata.json").read_text(encoding="utf-8")
+    assert '"x-debug": "safe"' in metadata
+    assert "Set-Cookie" not in metadata
+    assert "secret" not in metadata
+    assert paths.count("/blocked") == 1
+
+
+@pytest.mark.asyncio
+async def test_captcha_word_in_normal_script_is_not_a_block() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            text="<html><script>analytics.track('captcha_seen')</script><main>ok</main></html>",
+            request=request,
+        )
+
+    async with FLClient(config(), transport=httpx.MockTransport(handler)) as client:
+        assert "captcha_seen" in await client.get_html("/normal")
 
 
 @pytest.mark.asyncio
@@ -85,6 +116,42 @@ async def test_retry_after_and_stable_user_agent(monkeypatch) -> None:
         assert await client.get_html("/x") == "ok"
         assert agents[0] == agents[1]
         assert (await client.metrics()).rate_limited_total == 1
+
+
+@pytest.mark.asyncio
+async def test_server_cookies_persist_for_following_requests() -> None:
+    received_cookies: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        received_cookies.append(request.headers.get("Cookie", ""))
+        if len(received_cookies) == 1:
+            return httpx.Response(200, headers={"Set-Cookie": "session=token; Path=/"}, request=request)
+        return httpx.Response(200, text="ok", request=request)
+
+    async with FLClient(config(), transport=httpx.MockTransport(handler)) as client:
+        await client.get_html("/first")
+        await client.get_html("/second")
+
+    assert "session=token" in received_cookies[1]
+
+
+@pytest.mark.asyncio
+async def test_batch_work_is_cancelled_when_a_block_is_detected() -> None:
+    cancellation_observed = asyncio.Event()
+
+    async def blocked() -> None:
+        raise BlockedError("blocked")
+
+    async def pending() -> None:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancellation_observed.set()
+
+    with pytest.raises(BlockedError, match="blocked"):
+        await _gather_batch_or_stop_on_block([blocked(), pending()])
+
+    assert cancellation_observed.is_set()
 
 
 @pytest.mark.asyncio

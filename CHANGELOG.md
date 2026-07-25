@@ -4,6 +4,22 @@ All notable changes are documented here. The project follows [Semantic Versionin
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-26
+
+### Added
+
+- Block-response diagnostics: sanitized response headers and body are saved under
+  `.flru-debug/blocked-.../` when CAPTCHA or anti-bot protection is detected.
+- `BlockedError.status_code` and `BlockedError.debug_path` for programmatic diagnostics.
+- Persistent server-set cookies shared by the transport's existing clients.
+- A conservative 0.5-second minimum interval between request starts by default.
+
+### Changed
+
+- CAPTCHA responses are never retried; batches and iterators stop immediately on a block.
+- Retry handling honors `Retry-After` for both HTTP 429 and HTTP 503 responses.
+- Block detection now requires strong evidence and ignores isolated `captcha` text in normal scripts.
+
 ## [0.3.0] - 2026-07-25
 
 ### Added

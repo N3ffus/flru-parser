@@ -33,6 +33,7 @@ htmlcov/
 *.db-wal
 failed-html/
 raw-html/
+.flru-debug/
 .cookies.txt
 
 # Editors and OS
