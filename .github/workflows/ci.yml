@@ -40,6 +40,9 @@ jobs:
   tests:
     name: Tests / Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -78,6 +81,7 @@ jobs:
         with:
           files: coverage.xml
           fail_ci_if_error: true
+          use_oidc: true
 
   package:
     name: Build and inspect distributions

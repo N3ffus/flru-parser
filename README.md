@@ -1,11 +1,12 @@
 # flru-parser
 
-[![PyPI](https://img.shields.io/pypi/v/flru-parser.svg)](https://pypi.org/project/flru-parser/)
-[![Python](https://img.shields.io/pypi/pyversions/flru-parser.svg)](https://pypi.org/project/flru-parser/)
-[![License](https://img.shields.io/pypi/l/flru-parser.svg)](LICENSE)
+[![Package version](https://img.shields.io/pypi/v/flru-parser.svg?label=package)](https://pypi.org/project/flru-parser/)
+[![Python versions](https://img.shields.io/pypi/pyversions/flru-parser.svg)](https://pypi.org/project/flru-parser/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Typing](https://img.shields.io/badge/typing-PEP%20561-blue)](src/flru/py.typed)
 [![Tests](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml?query=branch%3Amain)
 [![Codecov](https://codecov.io/gh/N3ffus/flru-parser/branch/main/graph/badge.svg)](https://codecov.io/gh/N3ffus/flru-parser/branch/main)
+[![Mypy: strict](https://img.shields.io/badge/mypy-strict-blue.svg)](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml?query=branch%3Amain)
 
 A typed, resilient, read-only Python client for public pages on [FL.ru](https://www.fl.ru/).
 The default API is intentionally small; production controls remain available when needed.

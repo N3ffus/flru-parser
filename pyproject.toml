@@ -7,7 +7,7 @@ name = "flru-parser"
 version = "0.3.2"
 description = "Simple, typed and resilient async/sync parser client for public FL.ru pages"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Andrey" }]
