@@ -34,7 +34,7 @@ classifiers = [
 
 [project.optional-dependencies]
 postgres = ["asyncpg>=0.30,<1"]
-redis = ["redis>=5.2,<8"]
+redis = ["redis>=5.2,<9"]
 observability = [
   "opentelemetry-api>=1.29,<2",
   "opentelemetry-sdk>=1.29,<2",
