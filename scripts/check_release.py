@@ -90,7 +90,7 @@ def main() -> None:
         "img.shields.io/pypi/pyversions/flru-parser.svg",
         "img.shields.io/badge/license-MIT-blue.svg",
         "actions/workflows/ci.yml/badge.svg?branch=main",
-        "codecov.io/gh/N3ffus/flru-parser/branch/main/graph/badge.svg",
+        "img.shields.io/badge/coverage-87.9%25-brightgreen.svg",
         "img.shields.io/badge/mypy-strict-blue.svg",
     ]
     missing_badges = [badge for badge in required_badges if badge not in readme]

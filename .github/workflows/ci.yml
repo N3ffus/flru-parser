@@ -40,9 +40,6 @@ jobs:
   tests:
     name: Tests / Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -75,14 +72,6 @@ jobs:
             coverage.xml
             htmlcov/
           if-no-files-found: error
-      - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.13'
-        uses: codecov/codecov-action@v5
-        with:
-          files: coverage.xml
-          fail_ci_if_error: true
-          use_oidc: true
-
   package:
     name: Build and inspect distributions
     runs-on: ubuntu-latest

@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Typing](https://img.shields.io/badge/typing-PEP%20561-blue)](src/flru/py.typed)
 [![Tests](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml?query=branch%3Amain)
-[![Codecov](https://codecov.io/gh/N3ffus/flru-parser/branch/main/graph/badge.svg)](https://codecov.io/gh/N3ffus/flru-parser/branch/main)
+[![Coverage: 87.9%](https://img.shields.io/badge/coverage-87.9%25-brightgreen.svg)](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml?query=branch%3Amain)
 [![Mypy: strict](https://img.shields.io/badge/mypy-strict-blue.svg)](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml?query=branch%3Amain)
 
 A typed, resilient, read-only Python client for public pages on [FL.ru](https://www.fl.ru/).
@@ -331,7 +331,8 @@ Install `flru-parser[observability]` before using these adapters.
 
 ## Quality
 
-The CI and Codecov badges above always show the current `main` result.
+The CI badge shows the current `main` result. CI enforces at least 85% branch coverage and
+publishes the XML and HTML reports as a workflow artifact.
 
 Run the complete local checks:
 
