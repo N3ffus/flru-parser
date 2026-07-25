@@ -40,7 +40,7 @@ class RequestEvent:
         )
 
 
-EventHandler = Callable[[RequestEvent], None | Awaitable[None]]
+EventHandler = Callable[[RequestEvent], Awaitable[None] | None]
 
 
 class Metrics:

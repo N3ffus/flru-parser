@@ -72,7 +72,6 @@ __version__ = "0.3.2"
 AsyncClient = Client
 
 __all__ = [
-    "__version__",
     "AsyncClient",
     "Attachment",
     "AuthenticationRequired",
@@ -130,9 +129,10 @@ __all__ = [
     "UnexpectedPageError",
     "UserProfile",
     "UserSummary",
-    "project_content_hash",
+    "__version__",
     "fetch_freelancers",
     "fetch_project",
     "fetch_projects",
     "fetch_user",
+    "project_content_hash",
 ]

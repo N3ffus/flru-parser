@@ -111,7 +111,10 @@ class CircuitBreaker:
             return
         async with self._lock:
             self._failures += 1
-            if self._state is CircuitState.HALF_OPEN or self._failures >= self._config.failure_threshold:
+            if (
+                self._state is CircuitState.HALF_OPEN
+                or self._failures >= self._config.failure_threshold
+            ):
                 self._state = CircuitState.OPEN
                 self._opened_at = monotonic()
                 self._half_open_calls = 0

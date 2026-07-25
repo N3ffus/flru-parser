@@ -41,7 +41,9 @@ def test_project_diagnostics() -> None:
     assert page.items[0].source is not None
     assert page.items[0].published_at.tzinfo is not None
 
-    end = parse_project_list("<html><main>Нет проектов</main></html>", "https://www.fl.ru/projects/?page=2", page=2)
+    end = parse_project_list(
+        "<html><main>Нет проектов</main></html>", "https://www.fl.ru/projects/?page=2", page=2
+    )
     assert "catalog_end" in end.diagnostics.warnings
 
 

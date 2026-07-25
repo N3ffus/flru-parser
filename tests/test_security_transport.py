@@ -14,14 +14,19 @@ from flru.security import redact_url, validate_url
 def config(**kwargs):
     return ClientConfig(
         respect_robots_txt=False,
-        retry=RetryConfig(max_attempts=2, base_delay=0, max_delay=0, jitter=0, total_timeout=10, max_total_delay=1),
+        retry=RetryConfig(
+            max_attempts=2, base_delay=0, max_delay=0, jitter=0, total_timeout=10, max_total_delay=1
+        ),
         rate_limit=RateLimitConfig(requests_per_second=1000, burst=10, max_concurrency=5),
         **kwargs,
     )
 
 
 def test_url_security_and_redaction() -> None:
-    assert redact_url("http://user:pass@proxy.local:8080/x?token=abc") == "http://***@proxy.local:8080/x?token=***"
+    assert (
+        redact_url("http://user:pass@proxy.local:8080/x?token=abc")
+        == "http://***@proxy.local:8080/x?token=***"
+    )
     assert validate_url("https://st.fl.ru/x", frozenset({"fl.ru"}), True).endswith("/x")
     with pytest.raises(SecurityError):
         validate_url("ftp://www.fl.ru/x", frozenset({"fl.ru"}), True)
@@ -65,7 +70,9 @@ async def test_block_auth_status_and_event_handler_failure(tmp_path, monkeypatch
     def broken_event(_event):
         raise RuntimeError("event failed")
 
-    async with FLClient(config(), transport=httpx.MockTransport(handler), event_handler=broken_event) as client:
+    async with FLClient(
+        config(), transport=httpx.MockTransport(handler), event_handler=broken_event
+    ) as client:
         with pytest.raises(BlockedError) as blocked:
             await client.get_html("/blocked")
         with pytest.raises(AuthenticationRequired):
@@ -125,7 +132,9 @@ async def test_server_cookies_persist_for_following_requests() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         received_cookies.append(request.headers.get("Cookie", ""))
         if len(received_cookies) == 1:
-            return httpx.Response(200, headers={"Set-Cookie": "session=token; Path=/"}, request=request)
+            return httpx.Response(
+                200, headers={"Set-Cookie": "session=token; Path=/"}, request=request
+            )
         return httpx.Response(200, text="ok", request=request)
 
     async with FLClient(config(), transport=httpx.MockTransport(handler)) as client:

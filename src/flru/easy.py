@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal, overload
+from typing import Any, Literal, cast, overload
 
 import httpx
 
@@ -76,26 +76,16 @@ class Client(FLClient):
             else concurrency
         )
         rps_value = (
-            (1.0 if config is None else base.rate_limit.requests_per_second)
-            if rps is None
-            else rps
+            (1.0 if config is None else base.rate_limit.requests_per_second) if rps is None else rps
         )
         retries_value = (
-            (5 if config is None else base.retry.max_attempts)
-            if retries is None
-            else retries
+            (5 if config is None else base.retry.max_attempts) if retries is None else retries
         )
         timeout_value = (
-            (30.0 if config is None else base.timeout.read)
-            if timeout is None
-            else timeout
+            (30.0 if config is None else base.timeout.read) if timeout is None else timeout
         )
         strict_value = base.strict_parsing if strict is None else strict
-        robots_value = (
-            base.respect_robots_txt
-            if respect_robots_txt is None
-            else respect_robots_txt
-        )
+        robots_value = base.respect_robots_txt if respect_robots_txt is None else respect_robots_txt
         http2_value = base.http2 if http2 is None else http2
         verify_ssl_value = base.verify_ssl if verify_ssl is None else verify_ssl
 
@@ -402,10 +392,7 @@ def _normalize_project_types(types: ProjectTypeInput) -> frozenset[ProjectType]:
     if types is None:
         return frozenset()
     values: Sequence[ProjectType | str]
-    if isinstance(types, (ProjectType, str)):
-        values = (types,)
-    else:
-        values = types
+    values = (types,) if isinstance(types, (ProjectType, str)) else types
 
     aliases = {
         "order": ProjectType.ORDER,
@@ -473,7 +460,7 @@ async def fetch_projects(
 ) -> list[ProjectSummary] | list[ProjectDetail]:
     """Fetch projects in one call and close the temporary client."""
     async with Client(**dict(client_options or {})) as client:
-        return await client.projects(**kwargs)
+        return cast(list[ProjectSummary] | list[ProjectDetail], await client.projects(**kwargs))
 
 
 async def fetch_project(

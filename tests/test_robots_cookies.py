@@ -72,12 +72,20 @@ async def test_robots_policy_failure_modes(monkeypatch) -> None:
 
     monkeypatch.setattr("flru.robots.httpx.AsyncClient", FailingClient)
     open_policy = RobotsPolicy(
-        base_url="https://www.fl.ru", user_agent="test", timeout=httpx.Timeout(1),
-        verify=True, cache_ttl=60, fail_closed=False,
+        base_url="https://www.fl.ru",
+        user_agent="test",
+        timeout=httpx.Timeout(1),
+        verify=True,
+        cache_ttl=60,
+        fail_closed=False,
     )
     closed_policy = RobotsPolicy(
-        base_url="https://www.fl.ru", user_agent="test", timeout=httpx.Timeout(1),
-        verify=True, cache_ttl=60, fail_closed=True,
+        base_url="https://www.fl.ru",
+        user_agent="test",
+        timeout=httpx.Timeout(1),
+        verify=True,
+        cache_ttl=60,
+        fail_closed=True,
     )
     assert await open_policy.allowed("https://www.fl.ru/x")
     assert not await closed_policy.allowed("https://www.fl.ru/x")

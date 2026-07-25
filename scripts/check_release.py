@@ -29,9 +29,7 @@ def main() -> None:
         )
 
     if args.tag and args.tag.removeprefix("v") != project_version:
-        raise SystemExit(
-            f"tag/version mismatch: tag={args.tag}, package={project_version}"
-        )
+        raise SystemExit(f"tag/version mismatch: tag={args.tag}, package={project_version}")
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     if "OWNER" in pyproject_text + readme and not args.allow_placeholder:

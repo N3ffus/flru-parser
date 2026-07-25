@@ -57,6 +57,7 @@ async def test_rate_limiter_concurrency() -> None:
     await asyncio.gather(*(worker() for _ in range(8)))
     assert maximum <= 2
 
+
 @pytest.mark.asyncio
 async def test_disabled_circuit_breaker_never_opens() -> None:
     breaker = CircuitBreaker(
@@ -65,6 +66,7 @@ async def test_disabled_circuit_breaker_never_opens() -> None:
     await breaker.record_failure()
     await breaker.record_failure()
     await breaker.before_call()
+
 
 @pytest.mark.asyncio
 async def test_direct_connection_is_not_put_on_proxy_cooldown() -> None:
@@ -77,6 +79,7 @@ async def test_direct_connection_is_not_put_on_proxy_cooldown() -> None:
 
     assert acquired_again.url is None
     assert acquired_again.cooldown_until == 0
+
 
 @pytest.mark.asyncio
 async def test_proxy_snapshot_redacts_credentials() -> None:

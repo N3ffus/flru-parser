@@ -11,5 +11,5 @@ def load_netscape_cookies(path: str | Path, *, domain_suffix: str = "fl.ru") -> 
     return {
         cookie.name: cookie.value
         for cookie in jar
-        if cookie.domain.lstrip(".").endswith(domain_suffix)
+        if cookie.value is not None and cookie.domain.lstrip(".").endswith(domain_suffix)
     }

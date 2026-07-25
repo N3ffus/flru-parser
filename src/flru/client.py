@@ -4,7 +4,7 @@ import asyncio
 import email.utils
 import re
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Iterable, Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Self, TypeVar, cast
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
@@ -115,7 +115,7 @@ class FLClient:
         base = config or ClientConfig()
         return cls(config=base.with_cookies(load_netscape_cookies(path)), **kwargs)
 
-    async def __aenter__(self) -> FLClient:
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *_: object) -> None:
@@ -400,22 +400,26 @@ class FLClient:
                     yield project
                 if consecutive_known >= stop_after_known:
                     await state.save_many(records)
-                    await state.save_checkpoint(CrawlCheckpoint(
-                        namespace=namespace,
-                        next_url=page.next_url,
-                        next_page=self._page_number(page.next_url),
-                        updated_at=datetime.now(timezone.utc),
-                        consecutive_known=consecutive_known,
-                    ))
+                    await state.save_checkpoint(
+                        CrawlCheckpoint(
+                            namespace=namespace,
+                            next_url=page.next_url,
+                            next_page=self._page_number(page.next_url),
+                            updated_at=datetime.now(UTC),
+                            consecutive_known=consecutive_known,
+                        )
+                    )
                     return
             await state.save_many(records)
-            await state.save_checkpoint(CrawlCheckpoint(
-                namespace=namespace,
-                next_url=page.next_url,
-                next_page=self._page_number(page.next_url),
-                updated_at=datetime.now(timezone.utc),
-                consecutive_known=consecutive_known,
-            ))
+            await state.save_checkpoint(
+                CrawlCheckpoint(
+                    namespace=namespace,
+                    next_url=page.next_url,
+                    next_page=self._page_number(page.next_url),
+                    updated_at=datetime.now(UTC),
+                    consecutive_known=consecutive_known,
+                )
+            )
 
     async def crawl_projects(self, **kwargs: Any) -> list[ProjectSummary]:
         return [project async for project in self.iter_projects(**kwargs)]
@@ -472,7 +476,9 @@ class FLClient:
                     task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def get_freelancers_page(self, page: int = 1, *, category: str | None = None) -> FreelancerPage:
+    async def get_freelancers_page(
+        self, page: int = 1, *, category: str | None = None
+    ) -> FreelancerPage:
         url = self._freelancers_url(category, page)
         html, effective_url, fetched_at = await self._get_document(url)
         try:
@@ -496,7 +502,9 @@ class FLClient:
             await self._record_parse_failure(effective_url, html, exc)
             raise
 
-    async def get_freelancers(self, page: int = 1, *, category: str | None = None) -> list[FreelancerSummary]:
+    async def get_freelancers(
+        self, page: int = 1, *, category: str | None = None
+    ) -> list[FreelancerSummary]:
         return (await self.get_freelancers_page(page, category=category)).items
 
     async def get_freelancers_batch_result(
@@ -535,7 +543,9 @@ class FLClient:
         return_exceptions: bool = False,
     ) -> list[FreelancerPage | Exception]:
         page_numbers = list(pages)
-        result = await self.get_freelancers_batch_result(page_numbers, category=category, concurrency=concurrency)
+        result = await self.get_freelancers_batch_result(
+            page_numbers, category=category, concurrency=concurrency
+        )
         if result.failed and not return_exceptions:
             raise result.failed[0].error
         mapping: dict[int, FreelancerPage | Exception] = {
@@ -558,7 +568,9 @@ class FLClient:
         current, emitted = start_page, 0
         while max_pages is None or emitted < max_pages:
             size = batch_size if max_pages is None else min(batch_size, max_pages - emitted)
-            batch = await self.get_freelancers_batch_result(range(current, current + size), category=category, concurrency=batch_size)
+            batch = await self.get_freelancers_batch_result(
+                range(current, current + size), category=category, concurrency=batch_size
+            )
             if batch.failed and fail_fast:
                 raise batch.failed[0].error
             pages = sorted(batch.successful, key=lambda item: item.page)
@@ -689,7 +701,9 @@ class FLClient:
         values = await self._collect_user_section(user, "portfolio", "portfolio", pages)
         return [cast(PortfolioItem, value) for value in values]
 
-    async def _collect_user_section(self, user: str, section: str, field: str, pages: int) -> list[Any]:
+    async def _collect_user_section(
+        self, user: str, section: str, field: str, pages: int
+    ) -> list[Any]:
         username = self._username(user)
         base = self._absolute(f"/users/{username}/{section}/")
         urls = [with_page(base, page) if page > 1 else base for page in range(1, pages + 1)]
@@ -719,12 +733,14 @@ class FLClient:
             seen.add(href)
             match = re.search(r"/projects/category/(.+?)/?$", urlsplit(href).path)
             slug = match.group(1) if match else None
-            result.append(Category(
-                name=name,
-                url=href,
-                slug=slug,
-                parent=slug.split("/", 1)[0] if slug and "/" in slug else None,
-            ))
+            result.append(
+                Category(
+                    name=name,
+                    url=href,
+                    slug=slug,
+                    parent=slug.split("/", 1)[0] if slug and "/" in slug else None,
+                )
+            )
         return result
 
     def _validate_project_page(self, page: ProjectPage) -> None:
@@ -744,19 +760,21 @@ class FLClient:
         html: str,
         error: ParseError | None = None,
     ) -> None:
-        changes = {"parse_failures_total": 1}
         if isinstance(error, SelectorDriftError):
-            changes["selector_drift_total"] = 1
-        await self._transport.metrics.mutate(**changes)
+            await self._transport.metrics.mutate(parse_failures_total=1, selector_drift_total=1)
+        else:
+            await self._transport.metrics.mutate(parse_failures_total=1)
         await self._transport.emit_event(
             RequestEvent("parse_failure", "GET", url, 1, self._endpoint(url))
         )
         if not self.config.store_failed_html or not self.config.failed_html_directory:
             return
         directory = Path(self.config.failed_html_directory)
-        directory.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(directory.mkdir, parents=True, exist_ok=True)
         safe_name = re.sub(r"[^a-zA-Z0-9_.-]+", "_", url)[:160]
-        await asyncio.to_thread((directory / f"{safe_name}.html").write_text, html, encoding="utf-8")
+        await asyncio.to_thread(
+            (directory / f"{safe_name}.html").write_text, html, encoding="utf-8"
+        )
 
     def _absolute(self, url: str) -> str:
         return urljoin(self.config.base_url.rstrip("/") + "/", url)
@@ -812,10 +830,10 @@ class FLClient:
         if value := response.headers.get("Date"):
             try:
                 parsed = email.utils.parsedate_to_datetime(value)
-                return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+                return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
             except (TypeError, ValueError):
                 pass
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
     @staticmethod
     def _endpoint(url: str) -> str:

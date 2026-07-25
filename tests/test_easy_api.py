@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -111,7 +111,6 @@ async def test_simple_incremental_and_one_shot() -> None:
     assert len(projects) == 1
 
 
-
 @pytest.mark.asyncio
 async def test_simple_incremental_resumes_checkpoint() -> None:
     state = MemoryStateStore()
@@ -119,7 +118,7 @@ async def test_simple_incremental_resumes_checkpoint() -> None:
         CrawlCheckpoint(
             namespace="projects",
             next_page=2,
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
         )
     )
 
@@ -158,8 +157,6 @@ def test_sync_simple_api() -> None:
     assert project.id == 5500001
 
 
-
-
 def test_simple_client_preserves_advanced_config_defaults() -> None:
     config = ClientConfig(
         retry=RetryConfig(max_attempts=2),
@@ -177,8 +174,7 @@ def test_simple_client_preserves_advanced_config_defaults() -> None:
 def test_simple_client_from_cookie_file(tmp_path: Path) -> None:
     cookie_file = tmp_path / "cookies.txt"
     cookie_file.write_text(
-        "# Netscape HTTP Cookie File\n"
-        ".fl.ru\tTRUE\t/\tFALSE\t2147483647\tsession\ttoken\n",
+        "# Netscape HTTP Cookie File\n.fl.ru\tTRUE\t/\tFALSE\t2147483647\tsession\ttoken\n",
         encoding="utf-8",
     )
 

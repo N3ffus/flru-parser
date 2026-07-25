@@ -6,7 +6,7 @@ import json
 import sqlite3
 from collections.abc import Iterable
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -20,7 +20,7 @@ def project_content_hash(project: ProjectSummary) -> str:
 
 
 def record_for(project: ProjectSummary, previous: ProjectRecord | None = None) -> ProjectRecord:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return ProjectRecord(
         project=project,
         first_seen_at=previous.first_seen_at if previous else now,
@@ -138,10 +138,7 @@ class SQLiteStateStore:
 
     async def save_many(self, records: Iterable[ProjectRecord]) -> None:
         await self._ensure_schema()
-        values = [
-            (record.project.id, record.model_dump_json())
-            for record in records
-        ]
+        values = [(record.project.id, record.model_dump_json()) for record in records]
         if values:
             await asyncio.to_thread(self._save_many_sync, values)
 

@@ -49,7 +49,9 @@ def _dump_blocked_response(response: httpx.Response) -> Path:
     (directory / "response.html").write_bytes(response.content)
     sensitive_headers = {"authorization", "cookie", "set-cookie", "proxy-authorization"}
     safe_headers = {
-        key: value for key, value in response.headers.items() if key.lower() not in sensitive_headers
+        key: value
+        for key, value in response.headers.items()
+        if key.lower() not in sensitive_headers
     }
     metadata = {
         "status_code": response.status_code,
@@ -158,12 +160,18 @@ class ResilientTransport:
             await circuit.before_call()
             timer = Timer()
             await self.metrics.mutate(endpoint=endpoint, requests_total=1)
-            await self._emit(RequestEvent("start", method, url, attempt, endpoint, proxy_state.safe_url))
+            await self._emit(
+                RequestEvent("start", method, url, attempt, endpoint, proxy_state.safe_url)
+            )
 
             try:
                 async with self._rate_limiter:
                     response = await self._request_following_safe_redirects(
-                        self._client(proxy_state.url), method, url, headers=request_headers, **kwargs
+                        self._client(proxy_state.url),
+                        method,
+                        url,
+                        headers=request_headers,
+                        **kwargs,
                     )
                 elapsed = timer.elapsed
                 await self.metrics.mutate(
@@ -224,7 +232,9 @@ class ResilientTransport:
                 last_error = exc
                 await self.metrics.mutate(endpoint=endpoint, failures_total=1)
                 if exc.status_code not in self.config.retry.retry_statuses:
-                    await self._emit_failure(method, url, attempt, endpoint, proxy_state, timer, exc)
+                    await self._emit_failure(
+                        method, url, attempt, endpoint, proxy_state, timer, exc
+                    )
                     raise
                 await self._proxy_pool.failure(proxy_state, exc)
             except BlockedError as exc:
@@ -300,7 +310,9 @@ class ResilientTransport:
         current_url = url
         body_kwargs = dict(kwargs)
         for _ in range(10):
-            response = await client.request(current_method, current_url, headers=headers, **body_kwargs)
+            response = await client.request(
+                current_method, current_url, headers=headers, **body_kwargs
+            )
             if not self.config.follow_redirects or response.status_code not in _REDIRECT_CODES:
                 return response
             location = response.headers.get("Location")

@@ -33,6 +33,7 @@ async def test_retries_count_as_one_circuit_failure() -> None:
 
     assert attempts == 6
 
+
 @pytest.mark.asyncio
 async def test_retry_metrics_are_incremented_once_per_retry() -> None:
     attempts = 0

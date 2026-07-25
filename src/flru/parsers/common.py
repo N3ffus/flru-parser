@@ -3,9 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any, Iterable
+from typing import Any
 from urllib.parse import urljoin, urlsplit
 from zoneinfo import ZoneInfo
 
@@ -18,13 +19,23 @@ PROJECT_URL_RE = re.compile(r"/projects/(?P<id>\d+)(?:(?:/[^?#]*)?\.html|/)?(?:[
 USER_URL_RE = re.compile(r"/users/(?P<username>[^/?#]+)/?(?:[^?#]*)?$")
 NUMBER_RE = re.compile(r"\d[\d\s\u00a0]*")
 MONTHS_RU = {
-    "января": 1, "февраля": 2, "марта": 3, "апреля": 4, "мая": 5, "июня": 6,
-    "июля": 7, "августа": 8, "сентября": 9, "октября": 10, "ноября": 11, "декабря": 12,
+    "января": 1,
+    "февраля": 2,
+    "марта": 3,
+    "апреля": 4,
+    "мая": 5,
+    "июня": 6,
+    "июля": 7,
+    "августа": 8,
+    "сентября": 9,
+    "октября": 10,
+    "ноября": 11,
+    "декабря": 12,
 }
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def page_fingerprint(html: str) -> str:
@@ -101,7 +112,15 @@ def parse_money(value: str | None) -> Money | None:
     if not raw:
         return None
     folded = raw.casefold()
-    currency = "RUB" if "₽" in raw or "руб" in folded else "USD" if "$" in raw or "usd" in folded else "EUR" if "€" in raw or "eur" in folded else None
+    currency = (
+        "RUB"
+        if "₽" in raw or "руб" in folded
+        else "USD"
+        if "$" in raw or "usd" in folded
+        else "EUR"
+        if "€" in raw or "eur" in folded
+        else None
+    )
     amounts = [parse_decimal(part) for part in re.findall(r"\d[\d\s\u00a0]*(?:[.,]\d+)?", raw)]
     numbers = [item for item in amounts if item is not None]
     return Money(
@@ -129,25 +148,54 @@ def parse_ru_datetime(
     folded = text.casefold()
     if folded.startswith("сегодня"):
         time_match = re.search(r"(\d{1,2}):(\d{2})", folded)
-        return now.replace(hour=int(time_match.group(1)) if time_match else 0, minute=int(time_match.group(2)) if time_match else 0, second=0, microsecond=0)
+        return now.replace(
+            hour=int(time_match.group(1)) if time_match else 0,
+            minute=int(time_match.group(2)) if time_match else 0,
+            second=0,
+            microsecond=0,
+        )
     if folded.startswith("вчера"):
         time_match = re.search(r"(\d{1,2}):(\d{2})", folded)
         value_dt = now - timedelta(days=1)
-        return value_dt.replace(hour=int(time_match.group(1)) if time_match else 0, minute=int(time_match.group(2)) if time_match else 0, second=0, microsecond=0)
-    absolute = re.search(r"(?P<day>\d{1,2})\s+(?P<month>[а-яё]+)(?:\s+(?P<year>\d{4}))?(?:[^\d]+(?P<hour>\d{1,2}):(?P<minute>\d{2}))?", folded)
+        return value_dt.replace(
+            hour=int(time_match.group(1)) if time_match else 0,
+            minute=int(time_match.group(2)) if time_match else 0,
+            second=0,
+            microsecond=0,
+        )
+    absolute = re.search(
+        r"(?P<day>\d{1,2})\s+(?P<month>[а-яё]+)(?:\s+(?P<year>\d{4}))?(?:[^\d]+(?P<hour>\d{1,2}):(?P<minute>\d{2}))?",
+        folded,
+    )
     if absolute and absolute.group("month") in MONTHS_RU:
         try:
             return datetime(
-                int(absolute.group("year") or now.year), MONTHS_RU[absolute.group("month")],
-                int(absolute.group("day")), int(absolute.group("hour") or 0),
-                int(absolute.group("minute") or 0), tzinfo=zone,
+                int(absolute.group("year") or now.year),
+                MONTHS_RU[absolute.group("month")],
+                int(absolute.group("day")),
+                int(absolute.group("hour") or 0),
+                int(absolute.group("minute") or 0),
+                tzinfo=zone,
             )
         except ValueError:
             return None
-    relative = re.search(r"(?P<count>\d+)\s+(?P<unit>минут\w*|час\w*|дн\w*|день|дня|недел\w*|месяц\w*)\s+назад", folded)
+    relative = re.search(
+        r"(?P<count>\d+)\s+(?P<unit>минут\w*|час\w*|дн\w*|день|дня|недел\w*|месяц\w*)\s+назад",
+        folded,
+    )
     if relative:
         count, unit = int(relative.group("count")), relative.group("unit")
-        delta = timedelta(minutes=count) if unit.startswith("минут") else timedelta(hours=count) if unit.startswith("час") else timedelta(days=count) if unit.startswith(("дн", "день", "дня")) else timedelta(weeks=count) if unit.startswith("недел") else timedelta(days=count * 30)
+        delta = (
+            timedelta(minutes=count)
+            if unit.startswith("минут")
+            else timedelta(hours=count)
+            if unit.startswith("час")
+            else timedelta(days=count)
+            if unit.startswith(("дн", "день", "дня"))
+            else timedelta(weeks=count)
+            if unit.startswith("недел")
+            else timedelta(days=count * 30)
+        )
         return now - delta
     return None
 
@@ -179,7 +227,9 @@ def extract_links(root: Tag | BeautifulSoup, base_url: str) -> list[Link]:
             continue
         seen.add(url)
         rel_value = node.get("rel")
-        rel = " ".join(rel_value) if isinstance(rel_value, list) else clean_text(str(rel_value or ""))
+        rel = (
+            " ".join(rel_value) if isinstance(rel_value, list) else clean_text(str(rel_value or ""))
+        )
         result.append(Link(text=text_of(node), url=url, rel=rel))
     return result
 
@@ -192,16 +242,25 @@ def extract_images(root: Tag | BeautifulSoup, base_url: str) -> list[Image]:
         if not url or url in seen:
             continue
         seen.add(url)
-        result.append(Image(url=url, alt=clean_text(str(node.get("alt") or "")), title=clean_text(str(node.get("title") or ""))))
+        result.append(
+            Image(
+                url=url,
+                alt=clean_text(str(node.get("alt") or "")),
+                title=clean_text(str(node.get("title") or "")),
+            )
+        )
     return result
 
 
-def parse_generic_page(html: str, url: str, *, store_raw_html: bool = False, fetched_at: datetime | None = None) -> PageData:
+def parse_generic_page(
+    html: str, url: str, *, store_raw_html: bool = False, fetched_at: datetime | None = None
+) -> PageData:
     soup = BeautifulSoup(html, "lxml")
     main = soup.select_one("main") or soup.body or soup
     tables: list[TableData] = []
     for table in main.select("table"):
-        rows, headers = [], []
+        rows: list[list[str]] = []
+        headers: list[str] = []
         for row in table.select("tr"):
             cells = [text_of(cell) or "" for cell in row.select("th,td")]
             if not cells:
@@ -217,11 +276,26 @@ def parse_generic_page(html: str, url: str, *, store_raw_html: bool = False, fet
         title=clean_text(soup.title.string if soup.title else None),
         canonical_url=absolute_url(url, canonical),
         metadata=extract_meta(soup),
-        headings=[Heading(level=int(node.name[1]), text=text_of(node) or "") for node in main.select("h1,h2,h3,h4,h5,h6") if text_of(node)],
+        headings=[
+            Heading(level=int(node.name[1]), text=text_of(node) or "")
+            for node in main.select("h1,h2,h3,h4,h5,h6")
+            if text_of(node)
+        ],
         paragraphs=[text for node in main.select("p") if (text := text_of(node))],
-        lists=[items for node in main.select("ul,ol") if (items := [text for li in node.find_all("li", recursive=False) if (text := text_of(li))])],
+        lists=[
+            items
+            for node in main.select("ul,ol")
+            if (
+                items := [
+                    text for li in node.find_all("li", recursive=False) if (text := text_of(li))
+                ]
+            )
+        ],
         tables=tables,
-        links=extract_links(main, url), images=extract_images(main, url), json_ld=extract_json_ld(soup),
-        text=multiline_text_of(main), raw_html=html if store_raw_html else None,
+        links=extract_links(main, url),
+        images=extract_images(main, url),
+        json_ld=extract_json_ld(soup),
+        text=multiline_text_of(main),
+        raw_html=html if store_raw_html else None,
         source=SourceInfo(source_url=url, fetched_at=fetched_at or utc_now()),
     )

@@ -8,7 +8,9 @@ from .exceptions import SecurityError
 _SECRET_QUERY_RE = re.compile(r"(?i)(token|key|password|secret|signature)=([^&]+)")
 
 
-def is_allowed_host(host: str | None, allowed_hosts: frozenset[str], allow_subdomains: bool) -> bool:
+def is_allowed_host(
+    host: str | None, allowed_hosts: frozenset[str], allow_subdomains: bool
+) -> bool:
     if not host:
         return False
     host = host.casefold().rstrip(".")

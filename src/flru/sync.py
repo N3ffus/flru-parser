@@ -4,7 +4,7 @@ import asyncio
 import threading
 from collections.abc import Coroutine, Mapping
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import httpx
 
@@ -12,7 +12,14 @@ from .config import ClientConfig
 from .easy import Client as AsyncClient
 from .easy import CookiesInput, ProxyInput
 from .filters import ProjectFilters
-from .models import FreelancerSummary, PageData, ProjectDetail, ProjectSummary, RequestMetrics, UserProfile
+from .models import (
+    FreelancerSummary,
+    PageData,
+    ProjectDetail,
+    ProjectSummary,
+    RequestMetrics,
+    UserProfile,
+)
 from .observability import EventHandler
 from .state import CrawlStateStore
 
@@ -107,7 +114,10 @@ class Client:
         self.close()
 
     def projects(self, **kwargs: Any) -> list[ProjectSummary] | list[ProjectDetail]:
-        return self._loop_thread.run(self._client.projects(**kwargs))
+        return cast(
+            list[ProjectSummary] | list[ProjectDetail],
+            self._loop_thread.run(self._client.projects(**kwargs)),
+        )
 
     def project(self, project: int | str) -> ProjectDetail:
         return self._loop_thread.run(self._client.project(project))

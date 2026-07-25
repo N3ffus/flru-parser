@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import urlsplit
+from datetime import datetime
 
 from bs4 import BeautifulSoup, Tag
 
@@ -14,9 +14,8 @@ from .common import (
     extract_meta,
     first_attr,
     first_text,
-    parse_decimal,
-    parse_int,
     multiline_text_of,
+    parse_decimal,
     parse_money,
     text_of,
     username_from_url,
@@ -63,7 +62,7 @@ def _extract_reviews(root: Tag, url: str) -> list[Review]:
             continue
         author_anchor = node.find("a", href=re.compile(r"/users/[^/?#]+/?"))
         author = None
-        if author_anchor:
+        if isinstance(author_anchor, Tag):
             author_url = absolute_url(url, str(author_anchor.get("href")))
             author = UserSummary(
                 username=username_from_url(author_url or ""),
@@ -103,21 +102,30 @@ def _extract_portfolio(root: Tag, url: str) -> list[PortfolioItem]:
     return items
 
 
-def parse_user_profile(html: str, url: str, *, store_raw_html: bool = False, fetched_at=None) -> UserProfile:
+def parse_user_profile(
+    html: str,
+    url: str,
+    *,
+    store_raw_html: bool = False,
+    fetched_at: datetime | None = None,
+) -> UserProfile:
     fetched_at = fetched_at or utc_now()
     soup = BeautifulSoup(html, "lxml")
     root = soup.select_one("main") or soup.body or soup
     raw_text = multiline_text_of(root) or ""
     name_from_title, user_id, role, location = _title_fields(soup)
-    name = first_text(
-        root,
-        (
-            "h1",
-            '[itemprop="name"]',
-            ".user-name",
-            '[class*="profile"] h2',
-        ),
-    ) or name_from_title
+    name = (
+        first_text(
+            root,
+            (
+                "h1",
+                '[itemprop="name"]',
+                ".user-name",
+                '[class*="profile"] h2',
+            ),
+        )
+        or name_from_title
+    )
     username = username_from_url(url)
 
     registered_match = re.search(r"На сайте\s+([^\n(]+)", raw_text, re.IGNORECASE)

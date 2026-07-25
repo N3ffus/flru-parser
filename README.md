@@ -111,7 +111,7 @@ projects = await fl.projects(
     category="programmirovanie/python",
     min_budget=30_000,
     max_budget=200_000,
-    types="order",            # order, vacancy, contest
+    types="order",  # order, vacancy, contest
     with_budget=True,
     concurrency=3,
 )

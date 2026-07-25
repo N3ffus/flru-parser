@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-import pytest
-
-hypothesis = pytest.importorskip("hypothesis")
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from flru import ProjectSummary
 from flru.security import redact_url

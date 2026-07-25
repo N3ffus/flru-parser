@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -26,7 +25,9 @@ from flru.state import project_content_hash, record_for
 FIXTURES = Path(__file__).parent / "fixtures"
 PROJECTS = (FIXTURES / "projects.html").read_text(encoding="utf-8")
 PROJECT = (FIXTURES / "project.html").read_text(encoding="utf-8")
-PROJECTS_WITH_CATEGORY = PROJECTS.replace("<main id=", "<a href='/projects/category/programmirovanie/'>Программирование</a><main id=")
+PROJECTS_WITH_CATEGORY = PROJECTS.replace(
+    "<main id=", "<a href='/projects/category/programmirovanie/'>Программирование</a><main id="
+)
 USER = (FIXTURES / "user.html").read_text(encoding="utf-8")
 FREELANCERS = (FIXTURES / "freelancers.html").read_text(encoding="utf-8")
 
@@ -44,19 +45,32 @@ def router(request: httpx.Request) -> httpx.Response:
     path = request.url.path
     page = request.url.params.get("page")
     if path == "/projects/" and page in {None, "1"}:
-        return httpx.Response(200, text=PROJECTS_WITH_CATEGORY, request=request, headers={"Date": "Sat, 25 Jul 2026 12:00:00 GMT"})
+        return httpx.Response(
+            200,
+            text=PROJECTS_WITH_CATEGORY,
+            request=request,
+            headers={"Date": "Sat, 25 Jul 2026 12:00:00 GMT"},
+        )
     if path == "/projects/" and page == "2":
-        return httpx.Response(200, text="<html><main id='projects-list'>Нет проектов</main></html>", request=request)
+        return httpx.Response(
+            200, text="<html><main id='projects-list'>Нет проектов</main></html>", request=request
+        )
     if path.startswith("/projects/5500001"):
         return httpx.Response(200, text=PROJECT, request=request)
     if path == "/freelancers/":
         return httpx.Response(200, text=FREELANCERS, request=request)
     if path == "/freelancers/page-2/":
-        return httpx.Response(200, text="<html><main>Нет исполнителей</main></html>", request=request)
+        return httpx.Response(
+            200, text="<html><main>Нет исполнителей</main></html>", request=request
+        )
     if path.startswith("/users/customer-one"):
         return httpx.Response(200, text=USER, request=request)
     if path == "/generic/":
-        return httpx.Response(200, text="<html><head><title>X</title></head><main><h1>Y</h1></main></html>", request=request)
+        return httpx.Response(
+            200,
+            text="<html><head><title>X</title></head><main><h1>Y</h1></main></html>",
+            request=request,
+        )
     return httpx.Response(404, request=request)
 
 
@@ -99,7 +113,10 @@ async def test_client_extended_read_api() -> None:
             (page for page in [1, 2]),
             concurrency=2,
         )
-        assert [item.page for item in generator_batch if not isinstance(item, BaseException)] == [1, 2]
+        assert [item.page for item in generator_batch if not isinstance(item, BaseException)] == [
+            1,
+            2,
+        ]
 
         pages = [item async for item in client.iter_project_pages(max_pages=3, batch_size=2)]
         assert [item.page for item in pages] == [1, 2]
@@ -114,7 +131,10 @@ async def test_client_extended_read_api() -> None:
         assert len(details.successful) == 1
         assert len(details.failed) == 1
 
-        pipeline = [item async for item in client.iter_project_details(projects[:1], workers=2, queue_size=2)]
+        pipeline = [
+            item
+            async for item in client.iter_project_details(projects[:1], workers=2, queue_size=2)
+        ]
         assert pipeline[0].id == 5500001
 
         freelancers = await client.get_freelancers()
@@ -151,7 +171,7 @@ async def test_incremental_state_and_sqlite(tmp_path: Path) -> None:
     assert await memory.contains(1)
     second = record_for(project, await memory.get(1))
     assert second.first_seen_at == first.first_seen_at
-    checkpoint = CrawlCheckpoint(namespace="x", next_page=2, updated_at=datetime.now(timezone.utc))
+    checkpoint = CrawlCheckpoint(namespace="x", next_page=2, updated_at=datetime.now(UTC))
     await memory.save_checkpoint(checkpoint)
     assert (await memory.get_checkpoint("x")).next_page == 2
 
@@ -208,6 +228,7 @@ def test_with_cookies_keeps_original_config_unchanged() -> None:
 
     assert dict(original.cookies) == {"one": "1"}
     assert dict(updated.cookies) == {"one": "1", "two": "2"}
+
 
 @pytest.mark.asyncio
 async def test_update_cookies_before_first_request_is_applied() -> None:

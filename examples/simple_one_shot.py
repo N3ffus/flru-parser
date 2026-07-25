@@ -2,7 +2,6 @@ import asyncio
 
 from flru import fetch_projects
 
-
 projects = asyncio.run(
     fetch_projects(
         pages=3,

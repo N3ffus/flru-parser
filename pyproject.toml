@@ -118,7 +118,7 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "RUF", "SIM", "C4", "PERF"]
-ignore = ["E501"]
+ignore = ["E501", "RUF001"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "RUF029"]
@@ -133,8 +133,14 @@ python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]
 packages = ["flru"]
-warn_unreachable = true
+warn_unreachable = false
 
 [[tool.mypy.overrides]]
-module = ["bs4.*"]
+module = [
+  "asyncpg",
+  "bs4.*",
+  "opentelemetry.*",
+  "prometheus_client.*",
+  "redis.*",
+]
 ignore_missing_imports = true

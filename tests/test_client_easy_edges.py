@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -18,11 +18,13 @@ from flru.easy import (
     _state_store,
     _validate_start_page,
 )
-from flru.exceptions import BlockedError, EmptyPageError, SelectorDriftError
+from flru.exceptions import EmptyPageError, SelectorDriftError
 from flru.models import ParseDiagnostics, ProjectPage
 
 
-def _page(*, page: int = 1, has_next: bool = False, items: list[ProjectSummary] | None = None) -> ProjectPage:
+def _page(
+    *, page: int = 1, has_next: bool = False, items: list[ProjectSummary] | None = None
+) -> ProjectPage:
     return ProjectPage(
         page=page,
         url="https://www.fl.ru/projects/",
@@ -84,7 +86,7 @@ def test_client_url_and_response_helpers() -> None:
     response = httpx.Response(200, headers={"Date": "invalid"})
     assert FLClient._response_datetime(response).tzinfo is not None
     dated = httpx.Response(200, headers={"Date": "Sat, 25 Jul 2026 12:00:00 GMT"})
-    assert FLClient._response_datetime(dated) == datetime(2026, 7, 25, 12, tzinfo=timezone.utc)
+    assert FLClient._response_datetime(dated) == datetime(2026, 7, 25, 12, tzinfo=UTC)
 
 
 @pytest.mark.asyncio
@@ -93,7 +95,9 @@ async def test_client_iteration_errors_and_validation() -> None:
     with pytest.raises(ValueError, match="batch_size"):
         _ = [page async for page in client.iter_project_pages(batch_size=0)]
 
-    client.get_projects_batch_result = AsyncMock(return_value=type("Batch", (), {"failed": [], "successful": []})())  # type: ignore[method-assign]
+    client.get_projects_batch_result = AsyncMock(
+        return_value=type("Batch", (), {"failed": [], "successful": []})()
+    )  # type: ignore[method-assign]
     assert [page async for page in client.iter_project_pages(max_pages=1)] == []
 
     order = ProjectSummary(
@@ -139,7 +143,11 @@ async def test_simple_client_delegates_single_page_and_details() -> None:
     api = Client(respect_robots_txt=False)
     item = ProjectSummary(id=1, title="x", url="https://www.fl.ru/projects/1/")
     api.get_projects = AsyncMock(return_value=[item])  # type: ignore[method-assign]
-    api.get_project_details_result = AsyncMock(return_value=type("Result", (), {"successful": [item], "raise_for_errors": lambda self: None})())  # type: ignore[method-assign]
+    api.get_project_details_result = AsyncMock(
+        return_value=type(
+            "Result", (), {"successful": [item], "raise_for_errors": lambda self: None}
+        )()
+    )  # type: ignore[method-assign]
     assert await api.projects() == [item]
     assert await api.projects(details=True) == [item]
     with pytest.raises(ValueError, match="pages"):

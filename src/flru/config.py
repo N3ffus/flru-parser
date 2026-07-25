@@ -109,7 +109,9 @@ class ClientConfig:
             raise ConfigurationError("total_timeout must be positive")
         if not self.user_agents:
             raise ConfigurationError("at least one user agent is required")
-        if not host or not any(host == allowed or host.endswith(f".{allowed}") for allowed in self.allowed_hosts):
+        if not host or not any(
+            host == allowed or host.endswith(f".{allowed}") for allowed in self.allowed_hosts
+        ):
             raise ConfigurationError("base_url host must be present in allowed_hosts")
 
     def with_cookies(self, cookies: Mapping[str, str]) -> ClientConfig:
