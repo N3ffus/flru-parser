@@ -33,14 +33,14 @@ jobs:
         run: uv run flru-canary --pretty | tee canary.json
       - name: Upload result
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: canary-${{ github.run_id }}
           path: canary.json
           if-no-files-found: ignore
       - name: Open or update drift issue
         if: failure()
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const label = "selector-drift";

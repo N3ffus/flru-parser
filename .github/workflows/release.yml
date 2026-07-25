@@ -42,7 +42,7 @@ jobs:
       - name: Validate distributions
         run: uvx twine check dist/*
       - name: Store distributions
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: python-package-distributions
           path: dist/
@@ -59,7 +59,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: python-package-distributions
           path: dist/
@@ -80,7 +80,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: python-package-distributions
           path: dist/
