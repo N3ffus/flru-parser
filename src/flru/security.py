@@ -33,9 +33,7 @@ def redact_url(url: str | None) -> str | None:
     parts = urlsplit(url)
     hostname = parts.hostname or ""
     port = f":{parts.port}" if parts.port else ""
-    userinfo = ""
-    if parts.username:
-        userinfo = f"{parts.username}:***@"
+    userinfo = "***@" if parts.username else ""
     netloc = f"{userinfo}{hostname}{port}"
     query = _SECRET_QUERY_RE.sub(lambda match: f"{match.group(1)}=***", parts.query)
     return urlunsplit(SplitResult(parts.scheme, netloc, parts.path, query, parts.fragment))

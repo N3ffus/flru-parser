@@ -21,7 +21,7 @@ def config(**kwargs):
 
 
 def test_url_security_and_redaction() -> None:
-    assert redact_url("http://user:pass@proxy.local:8080/x?token=abc") == "http://user:***@proxy.local:8080/x?token=***"
+    assert redact_url("http://user:pass@proxy.local:8080/x?token=abc") == "http://***@proxy.local:8080/x?token=***"
     assert validate_url("https://st.fl.ru/x", frozenset({"fl.ru"}), True).endswith("/x")
     with pytest.raises(SecurityError):
         validate_url("ftp://www.fl.ru/x", frozenset({"fl.ru"}), True)

@@ -89,5 +89,5 @@ async def test_proxy_snapshot_redacts_credentials() -> None:
 
     snapshot = await pool.snapshot()
 
-    assert snapshot[0].url == "http://user:***@proxy.example:8080"
+    assert snapshot[0].url == "http://***@proxy.example:8080"
     assert "password" not in (snapshot[0].url or "")

@@ -4,7 +4,7 @@ from flru.parsers import parse_freelancer_list
 
 
 def test_freelancer_list() -> None:
-    html = (Path(__file__).parent / "fixtures" / "freelancers.html").read_text()
+    html = (Path(__file__).parent / "fixtures" / "freelancers.html").read_text(encoding="utf-8")
     page = parse_freelancer_list(html, "https://www.fl.ru/freelancers/")
     assert len(page.items) == 1
     assert page.has_next is True
