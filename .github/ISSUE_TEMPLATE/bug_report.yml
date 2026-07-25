@@ -1,0 +1,50 @@
+name: Bug report
+description: Report an incorrect parse, transport failure, or regression
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach cookies, credentials, raw private pages, or unsanitized personal data.
+  - type: input
+    id: version
+    attributes:
+      label: flru-parser version
+      placeholder: 0.3.0
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Projects catalog
+        - Project details
+        - Freelancers
+        - User profile
+        - Transport/retries/proxies
+        - State store
+        - Packaging/types
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics and traceback
+      description: Include ParseDiagnostics where available. Redact all secrets and personal data.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true

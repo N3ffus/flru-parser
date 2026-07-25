@@ -1,0 +1,20 @@
+name: Feature request
+description: Propose a typed field, endpoint, state store, or reliability improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: Proposed public API or behavior
+      render: python
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

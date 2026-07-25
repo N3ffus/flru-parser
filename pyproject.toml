@@ -1,0 +1,139 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flru-parser"
+version = "0.3.0"
+description = "Simple, typed and resilient async/sync parser client for public FL.ru pages"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Andrey" }]
+keywords = ["fl.ru", "freelance", "parser", "scraper", "asyncio", "httpx"]
+dependencies = [
+  "beautifulsoup4>=4.12,<5",
+  "httpx[http2]>=0.28,<1",
+  "lxml>=5,<7",
+  "pydantic>=2.10,<3",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: AsyncIO",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+postgres = ["asyncpg>=0.30,<1"]
+redis = ["redis>=5.2,<8"]
+observability = [
+  "opentelemetry-api>=1.29,<2",
+  "opentelemetry-sdk>=1.29,<2",
+  "prometheus-client>=0.21,<1",
+]
+
+[dependency-groups]
+dev = [
+  "build>=1.3,<2",
+  "hypothesis>=6.136,<7",
+  "mypy>=2.3,<3",
+  "pre-commit>=4,<5",
+  "pytest>=9,<10",
+  "pytest-asyncio>=1.2,<2",
+  "pytest-cov>=7,<8",
+  "respx>=0.22,<1",
+  "ruff>=0.16,<1",
+  "twine>=6.2,<7",
+  "types-beautifulsoup4>=4.12,<5",
+]
+
+[project.scripts]
+flru-canary = "flru.canary:main"
+
+[project.urls]
+Documentation = "https://github.com/N3ffus/flru-parser#readme"
+Changelog = "https://github.com/N3ffus/flru-parser/blob/main/CHANGELOG.md"
+Issues = "https://github.com/N3ffus/flru-parser/issues"
+Repository = "https://github.com/N3ffus/flru-parser"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+flru = ["py.typed"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+  "live: requests a live FL.ru page; disabled by default",
+  "integration: integration tests using optional services",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["flru"]
+branch = true
+parallel = true
+omit = [
+  "src/flru/canary.py",
+  "src/flru/sync.py",
+  "src/flru/integrations/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 85
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+  "@overload",
+  "class PostgresStateStore",
+  "class RedisStateStore",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "RUF", "SIM", "C4", "PERF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "RUF029"]
+"src/flru/state.py" = ["RUF029"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+packages = ["flru"]
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["bs4.*"]
+ignore_missing_imports = true
