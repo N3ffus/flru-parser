@@ -4,8 +4,8 @@
 [![Python](https://img.shields.io/pypi/pyversions/flru-parser.svg)](https://pypi.org/project/flru-parser/)
 [![License](https://img.shields.io/pypi/l/flru-parser.svg)](LICENSE)
 [![Typing](https://img.shields.io/badge/typing-PEP%20561-blue)](src/flru/py.typed)
-[![Tests](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml?query=branch%3Amaster)
-[![Codecov](https://codecov.io/gh/N3ffus/flru-parser/branch/master/graph/badge.svg)](https://codecov.io/gh/N3ffus/flru-parser/branch/master)
+[![Tests](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml?query=branch%3Amain)
+[![Codecov](https://codecov.io/gh/N3ffus/flru-parser/branch/main/graph/badge.svg)](https://codecov.io/gh/N3ffus/flru-parser/branch/main)
 
 A typed, resilient, read-only Python client for public pages on [FL.ru](https://www.fl.ru/).
 The default API is intentionally small; production controls remain available when needed.
@@ -330,7 +330,7 @@ Install `flru-parser[observability]` before using these adapters.
 
 ## Quality
 
-The CI and Codecov badges above always show the current `master` result.
+The CI and Codecov badges above always show the current `main` result.
 
 Run the complete local checks:
 
