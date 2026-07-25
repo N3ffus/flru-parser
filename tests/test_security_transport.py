@@ -6,8 +6,8 @@ import httpx
 import pytest
 
 from flru import ClientConfig, FLClient, RateLimitConfig, RetryConfig
-from flru.exceptions import AuthenticationRequired, BlockedError, HTTPStatusError, SecurityError
 from flru.client import _gather_batch_or_stop_on_block
+from flru.exceptions import AuthenticationRequired, BlockedError, HTTPStatusError, SecurityError
 from flru.security import redact_url, validate_url
 
 
