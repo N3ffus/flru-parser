@@ -1,7 +1,7 @@
 # flru-parser
 
 [![Package version](https://img.shields.io/pypi/v/flru-parser.svg?label=package)](https://pypi.org/project/flru-parser/)
-[![Python versions](https://img.shields.io/pypi/pyversions/flru-parser.svg)](https://pypi.org/project/flru-parser/)
+[![Python: 3.11 | 3.12 | 3.13](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://pypi.org/project/flru-parser/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Typing](https://img.shields.io/badge/typing-PEP%20561-blue)](src/flru/py.typed)
 [![Tests](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/N3ffus/flru-parser/actions/workflows/ci.yml?query=branch%3Amain)

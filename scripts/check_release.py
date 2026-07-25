@@ -87,7 +87,7 @@ def main() -> None:
 
     required_badges = [
         "img.shields.io/pypi/v/flru-parser.svg?label=package",
-        "img.shields.io/pypi/pyversions/flru-parser.svg",
+        "img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg",
         "img.shields.io/badge/license-MIT-blue.svg",
         "actions/workflows/ci.yml/badge.svg?branch=main",
         "img.shields.io/badge/coverage-87.9%25-brightgreen.svg",
