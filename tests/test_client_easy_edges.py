@@ -7,13 +7,14 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from flru import ClientConfig, FLClient, ProjectKind, ProjectSummary
+from flru import ClientConfig, FLClient, ProjectFilters, ProjectKind, ProjectSummary, ProjectType
 from flru.easy import (
     Client,
     _normalize_cookies,
     _normalize_page_count,
     _normalize_project_types,
     _normalize_proxies,
+    _project_filters,
     _state_store,
     _validate_start_page,
 )
@@ -46,6 +47,15 @@ def test_easy_normalizers_and_validation(tmp_path: Path) -> None:
         with pytest.raises(ValueError):
             _validate_start_page(value)
     assert _normalize_project_types(["order", "ВАКАНСИЯ"])
+    default_filters = _project_filters(
+        query=None,
+        category=None,
+        min_budget=None,
+        max_budget=None,
+        types=None,
+        with_budget=None,
+    )
+    assert default_filters.to_params()["kind"] == ["1"]
     with pytest.raises(ValueError, match="unknown project type"):
         _normalize_project_types("other")
     store, owned = _state_store(tmp_path / "state.db")
@@ -86,6 +96,27 @@ async def test_client_iteration_errors_and_validation() -> None:
     client.get_projects_batch_result = AsyncMock(return_value=type("Batch", (), {"failed": [], "successful": []})())  # type: ignore[method-assign]
     assert [page async for page in client.iter_project_pages(max_pages=1)] == []
 
+    order = ProjectSummary(
+        id=1,
+        title="order",
+        url="https://www.fl.ru/projects/1/",
+        kind=ProjectKind.ORDER,
+    )
+    vacancy = ProjectSummary(
+        id=2,
+        title="vacancy",
+        url="https://www.fl.ru/projects/2/",
+        kind=ProjectKind.VACANCY,
+    )
+    client.iter_project_pages = lambda **_: _async_pages(_page(items=[order, vacancy]))  # type: ignore[method-assign]
+    filtered = [
+        item
+        async for item in client.iter_projects(
+            filters=ProjectFilters(project_types=frozenset({ProjectType.ORDER}))
+        )
+    ]
+    assert filtered == [order]
+
     empty = _page()
     with pytest.raises(EmptyPageError):
         client._validate_project_page(empty)
@@ -96,7 +127,11 @@ async def test_client_iteration_errors_and_validation() -> None:
     accepted = _page(items=[ProjectSummary(id=1, title="x", url="https://www.fl.ru/projects/1/")])
     client._validate_project_page(accepted)
     await client.close()
-    await client.close()
+
+
+async def _async_pages(*pages: ProjectPage):  # type: ignore[no-untyped-def]
+    for page in pages:
+        yield page
 
 
 @pytest.mark.asyncio
@@ -110,4 +145,3 @@ async def test_simple_client_delegates_single_page_and_details() -> None:
     with pytest.raises(ValueError, match="pages"):
         await api.user("name", pages=0)
     await api.close()
-

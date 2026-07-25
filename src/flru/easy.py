@@ -444,12 +444,18 @@ def _project_filters(
     types: ProjectTypeInput,
     with_budget: bool | None,
 ) -> ProjectFilters:
+    # The public "projects" API represents FL.ru orders.  FL.ru's unfiltered
+    # catalog also contains vacancies and contests, so request orders unless
+    # callers explicitly select one or more kinds.
+    project_types = _normalize_project_types(types)
+    if types is None:
+        project_types = frozenset({ProjectType.ORDER})
     return ProjectFilters(
         query=query,
         category=category,
         budget_from=min_budget,
         budget_to=max_budget,
-        project_types=_normalize_project_types(types),
+        project_types=project_types,
         only_with_budget=with_budget,
     )
 

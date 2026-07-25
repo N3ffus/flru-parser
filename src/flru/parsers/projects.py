@@ -39,7 +39,7 @@ from .common import (
 
 TITLE_SELECTORS = ("h1", '[itemprop="name"]', ".b-page__title", ".project-title")
 DESCRIPTION_SELECTORS = (
-    '[itemprop="description"]', ".b-layout__txt_padbot_20", ".b-post__txt",
+    '[itemprop="description"]', ".b-layout__txt_padbot_20", ".b-post__txt.text-5",
     ".project-description", '[class*="description"]',
 )
 
@@ -48,8 +48,12 @@ def _find_card(anchor: Tag) -> Tag:
     for parent in anchor.parents:
         if not isinstance(parent, Tag):
             continue
-        classes = " ".join(parent.get("class", []))
-        if parent.name == "article" or re.search(r"(?:^|[-_ ])(?:project|b-post)(?:[-_ ]|$)", classes):
+        classes = set(parent.get("class", []))
+        if (
+            parent.name == "article"
+            or classes.intersection({"b-post", "project-card", "project", "catalog-item"})
+            or str(parent.get("data-id", "")).startswith("qa-lenta-")
+        ):
             return parent
         if parent.name in {"main", "body"}:
             break
@@ -124,7 +128,10 @@ def _next_page_url(soup: BeautifulSoup, url: str, page: int) -> str | None:
         return absolute_url(url, str(explicit.get("href")))
     for anchor in soup.select("a[href]"):
         href = absolute_url(url, str(anchor.get("href")))
-        if href and parse_qs(urlsplit(href).query).get("page") == [str(page + 1)]:
+        if href and (
+            parse_qs(urlsplit(href).query).get("page") == [str(page + 1)]
+            or re.search(rf"/page-{page + 1}/?$", urlsplit(href).path)
+        ):
             return href
     return None
 

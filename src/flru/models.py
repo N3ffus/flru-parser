@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-PARSER_VERSION = "0.3.0"
+PARSER_VERSION = "0.3.2"
 SCHEMA_VERSION = "1"
 
 

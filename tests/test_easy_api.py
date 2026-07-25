@@ -84,7 +84,7 @@ async def test_simple_details_stream_user_and_freelancers() -> None:
         freelancers = await api.freelancers()
 
     assert details and details[0].full_description
-    assert len(streamed) == 2
+    assert len(streamed) == 1
     assert project.id == 5500001
     assert user.projects and user.reviews and user.portfolio
     assert freelancers[0].username == "dev-one"
@@ -97,7 +97,7 @@ async def test_simple_incremental_and_one_shot() -> None:
         first = await api.new_projects(state, pages=2)
         second = await api.new_projects(state, pages=2, stop_after_known=1)
 
-    assert len(first) == 2
+    assert len(first) == 1
     assert second == []
 
     projects = await fetch_projects(
@@ -108,7 +108,7 @@ async def test_simple_incremental_and_one_shot() -> None:
             "transport": httpx.MockTransport(router),
         }
     )
-    assert len(projects) == 2
+    assert len(projects) == 1
 
 
 
@@ -154,7 +154,7 @@ def test_sync_simple_api() -> None:
         projects = api.projects()
         project = api.project(5500001)
 
-    assert len(projects) == 2
+    assert len(projects) == 1
     assert project.id == 5500001
 
 

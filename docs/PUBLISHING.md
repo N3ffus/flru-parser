@@ -34,7 +34,7 @@ uv pip install \
   --python /tmp/flru-test/bin/python \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple/ \
-  flru-parser==0.3.0
+  flru-parser==0.3.2
 ```
 
 On Windows, use `/tmp/flru-test/Scripts/python.exe` instead.
@@ -47,8 +47,8 @@ On Windows, use `/tmp/flru-test/Scripts/python.exe` instead.
 4. Commit, create an annotated tag, and push it:
 
 ```bash
-git tag -a v0.3.0 -m "flru-parser 0.3.0"
-git push origin main v0.3.0
+git tag -a v0.3.2 -m "flru-parser 0.3.2"
+git push origin main v0.3.2
 ```
 
 The workflow builds distributions once, validates them, and publishes the exact same artifacts through PyPI Trusted Publishing.

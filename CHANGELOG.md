@@ -4,6 +4,17 @@ All notable changes are documented here. The project follows [Semantic Versionin
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-26
+
+### Fixed
+
+- Parse current FL.ru catalog cards as complete cards instead of mistaking title elements
+  for card containers, restoring descriptions, budgets, kinds, and other card fields.
+- Follow FL.ru's `/projects/page-N/` pagination so `pages="all"` traverses the catalog.
+- Default the high-level projects APIs to orders (`kind=1`), preventing vacancies from
+  appearing among orders unless explicitly requested through `types`.
+- Keep package and parser metadata versions synchronized.
+
 ## [0.3.1] - 2026-07-26
 
 ### Added

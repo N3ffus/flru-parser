@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-07-26",
+  "source": "https://www.fl.ru/projects/?kind=1",
+  "command": "Client.stream_projects(pages=\"all\", concurrency=1)",
+  "version": "0.3.2",
+  "orders": 1269,
+  "catalog_pages": 43,
+  "vacancies": 0,
+  "priced": 1269,
+  "described": 1269,
+  "first_numeric_budget": {
+    "id": 5515259,
+    "raw": "15 000 руб",
+    "amount": "15000",
+    "currency": "RUB",
+    "description": "Необходима разработка технологических карт для стартапа по производству колбасных изделий и вяленого мяса"
+  }
+}

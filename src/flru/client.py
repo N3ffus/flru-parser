@@ -22,7 +22,7 @@ from .exceptions import (
     RobotsDeniedError,
     SelectorDriftError,
 )
-from .filters import ProjectFilters
+from .filters import ProjectFilters, ProjectType
 from .models import (
     Category,
     CrawlCheckpoint,
@@ -31,6 +31,7 @@ from .models import (
     PageData,
     PortfolioItem,
     ProjectDetail,
+    ProjectKind,
     ProjectPage,
     ProjectSummary,
     RequestMetrics,
@@ -199,6 +200,14 @@ class FLClient:
                 timezone_name=self.config.parser_timezone,
             )
             self._validate_project_page(result)
+            if filters and filters.project_types:
+                kind_map = {
+                    ProjectType.ORDER: ProjectKind.ORDER,
+                    ProjectType.VACANCY: ProjectKind.VACANCY,
+                    ProjectType.CONTEST: ProjectKind.CONTEST,
+                }
+                requested = {kind_map[item] for item in filters.project_types}
+                result.items = [item for item in result.items if item.kind in requested]
             return result
         except ParseError as exc:
             await self._record_parse_failure(effective_url, html, exc)
@@ -335,6 +344,16 @@ class FLClient:
         fail_fast: bool = True,
     ) -> AsyncIterator[ProjectSummary]:
         seen: set[int] = set()
+        allowed_kinds = {
+            ProjectType.ORDER: ProjectKind.ORDER,
+            ProjectType.VACANCY: ProjectKind.VACANCY,
+            ProjectType.CONTEST: ProjectKind.CONTEST,
+        }
+        requested_kinds = (
+            {allowed_kinds[item] for item in filters.project_types}
+            if filters and filters.project_types
+            else set()
+        )
         async for page in self.iter_project_pages(
             start_page=start_page,
             max_pages=max_pages,
@@ -345,6 +364,11 @@ class FLClient:
             fail_fast=fail_fast,
         ):
             for item in page.items:
+                # FL.ru can include pinned cards of another kind even when a
+                # `kind` filter is present, so enforce the requested kinds
+                # locally as well.
+                if requested_kinds and item.kind not in requested_kinds:
+                    continue
                 if deduplicate and item.id in seen:
                     continue
                 seen.add(item.id)
