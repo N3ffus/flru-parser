@@ -363,9 +363,15 @@ The release workflow uses PyPI Trusted Publishing and checks that the Git tag ma
 
 ```bash
 uv run python scripts/configure_project.py YOUR_GITHUB_USERNAME
-git tag -a v0.3.2 -m "flru-parser 0.3.2"
-git push origin main v0.3.2
+uv run python scripts/sync_version.py --check
 ```
+
+<!-- release-version:start -->
+```bash
+git tag -a v0.4.0 -m "flru-parser 0.4.0"
+git push origin main v0.4.0
+```
+<!-- release-version:end -->
 
 See [docs/PUBLISHING.md](docs/PUBLISHING.md) for the one-time PyPI and GitHub setup.
 
