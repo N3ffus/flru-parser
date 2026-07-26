@@ -1,4 +1,4 @@
-from .batch import BatchError, BatchResult
+from .batch import BatchError, BatchResult, StreamItemResult
 from .client import FLClient
 from .config import (
     CircuitBreakerConfig,
@@ -29,8 +29,10 @@ from .exceptions import (
     RobotsDeniedError,
     SecurityError,
     SelectorDriftError,
+    StateDataError,
     TransportError,
     UnexpectedPageError,
+    UnsupportedStateVersionError,
 )
 from .filters import ProjectFilters, ProjectType
 from .models import (
@@ -59,6 +61,8 @@ from .models import (
 )
 from .observability import RequestEvent, StructuredLogHandler
 from .state import (
+    STATE_PAYLOAD_VERSION,
+    STATE_SCHEMA_VERSION,
     CrawlStateStore,
     MemoryStateStore,
     PostgresStateStore,
@@ -67,11 +71,13 @@ from .state import (
     project_content_hash,
 )
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"
 
 AsyncClient = Client
 
 __all__ = [
+    "STATE_PAYLOAD_VERSION",
+    "STATE_SCHEMA_VERSION",
     "AsyncClient",
     "Attachment",
     "AuthenticationRequired",
@@ -123,10 +129,13 @@ __all__ = [
     "SecurityError",
     "SelectorDriftError",
     "SourceInfo",
+    "StateDataError",
+    "StreamItemResult",
     "StructuredLogHandler",
     "TimeoutConfig",
     "TransportError",
     "UnexpectedPageError",
+    "UnsupportedStateVersionError",
     "UserProfile",
     "UserSummary",
     "__version__",

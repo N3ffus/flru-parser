@@ -57,6 +57,14 @@ class SecurityError(FLRUError):
     """A URL violates the configured host or redirect policy."""
 
 
+class StateDataError(FLRUError):
+    """Persistent crawl state is corrupt or cannot be decoded."""
+
+
+class UnsupportedStateVersionError(StateDataError):
+    """Persistent crawl state was written by an unsupported future version."""
+
+
 class ParseError(FLRUError):
     """Page could not be parsed into the requested model."""
 

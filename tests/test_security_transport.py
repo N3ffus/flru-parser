@@ -174,3 +174,49 @@ async def test_shared_limiter_pause() -> None:
     async with limiter:
         pass
     assert asyncio.get_running_loop().time() - started >= 0.005
+
+
+@pytest.mark.asyncio
+async def test_cross_origin_redirect_strips_explicit_credentials() -> None:
+    seen: dict[str, str] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "www.fl.ru":
+            return httpx.Response(
+                302, headers={"Location": "https://st.fl.ru/final"}, request=request
+            )
+        seen.update(request.headers)
+        return httpx.Response(200, text="ok", request=request)
+
+    async with FLClient(config(), transport=httpx.MockTransport(handler)) as client:
+        await client.request(
+            "GET",
+            "/start",
+            headers={
+                "Authorization": "Bearer secret",
+                "Cookie": "session=secret",
+                "Proxy-Authorization": "Basic secret",
+                "X-Safe": "yes",
+            },
+        )
+
+    assert "authorization" not in seen
+    assert "proxy-authorization" not in seen
+    assert seen["x-safe"] == "yes"
+
+
+@pytest.mark.asyncio
+async def test_same_origin_redirect_keeps_explicit_credentials() -> None:
+    seen = ""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal seen
+        if request.url.path == "/start":
+            return httpx.Response(302, headers={"Location": "/final"}, request=request)
+        seen = request.headers.get("Authorization", "")
+        return httpx.Response(200, text="ok", request=request)
+
+    async with FLClient(config(), transport=httpx.MockTransport(handler)) as client:
+        await client.request("GET", "/start", headers={"Authorization": "Bearer safe"})
+
+    assert seen == "Bearer safe"

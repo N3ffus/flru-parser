@@ -39,8 +39,42 @@ def utc_now() -> datetime:
 
 
 def page_fingerprint(html: str) -> str:
+    """Return a content fingerprint (legacy public name)."""
+    return content_fingerprint(html)
+
+
+def content_fingerprint(html: str) -> str:
+    """Hash normalized page content, including reader-visible text."""
     normalized = SPACE_RE.sub(" ", html).strip()
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+def structural_tokens(html: str) -> frozenset[str]:
+    """Extract stable markup signals while ignoring text and volatile identifiers."""
+    soup = BeautifulSoup(html, "lxml")
+    tokens: set[str] = set()
+    for node in soup.find_all(True):
+        tokens.add(f"tag:{node.name}")
+        for class_name in node.get("class", []):
+            normalized = str(class_name).casefold()
+            if len(normalized) <= 40 and not re.search(r"\d{4,}|[a-f0-9]{10,}", normalized):
+                tokens.add(f"class:{normalized}")
+    link_count = len(soup.find_all("a", href=True))
+    bucket = min(link_count // 10, 10)
+    tokens.add(f"link_bucket:{bucket}")
+    return frozenset(tokens)
+
+
+def structural_fingerprint(html: str) -> str:
+    payload = "\n".join(sorted(structural_tokens(html)))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def structural_similarity(left: str, right: str) -> float:
+    left_tokens = structural_tokens(left)
+    right_tokens = structural_tokens(right)
+    union = left_tokens | right_tokens
+    return len(left_tokens & right_tokens) / len(union) if union else 1.0
 
 
 def clean_text(value: str | None) -> str | None:

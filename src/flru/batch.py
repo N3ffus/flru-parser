@@ -26,3 +26,16 @@ class BatchResult(Generic[K, T]):
         if self.failed:
             first = self.failed[0]
             raise first.error
+
+
+@dataclass(slots=True, frozen=True)
+class StreamItemResult(Generic[K, T]):
+    """Runtime result for one item in a concurrent stream."""
+
+    key: K
+    value: T | None = None
+    error: Exception | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.error is None

@@ -94,3 +94,40 @@ async def test_proxy_snapshot_redacts_credentials() -> None:
 
     assert snapshot[0].url == "http://***@proxy.example:8080"
     assert "password" not in (snapshot[0].url or "")
+
+
+@pytest.mark.asyncio
+async def test_direct_route_is_only_used_after_all_proxies_cool_down() -> None:
+    pool = ProxyPool(
+        ProxyConfig(
+            urls=("http://proxy-1", "http://proxy-2"),
+            max_failures=1,
+            cooldown=60,
+            direct_fallback=True,
+        )
+    )
+    first = await pool.acquire()
+    await pool.failure(first, RuntimeError("failed"))
+    second = await pool.acquire()
+    assert second.url not in {None, first.url}
+    await pool.failure(second, RuntimeError("failed"))
+    assert (await pool.acquire()).url is None
+
+
+@pytest.mark.asyncio
+async def test_failed_half_open_probe_reopens_and_releases_permit(monkeypatch) -> None:
+    now = 0.0
+    monkeypatch.setattr("flru.resilience.monotonic", lambda: now)
+    breaker = CircuitBreaker(
+        CircuitBreakerConfig(failure_threshold=1, recovery_timeout=1, half_open_max_calls=1)
+    )
+    await breaker.record_failure()
+    now = 2.0
+    await breaker.before_call()
+    await breaker.record_failure()
+    with pytest.raises(CircuitOpenError):
+        await breaker.before_call()
+    now = 4.0
+    await breaker.before_call()
+    await breaker.record_success()
+    assert breaker.state.value == "closed"

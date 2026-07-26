@@ -4,6 +4,7 @@ import asyncio
 import email.utils
 import json
 import random
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -42,9 +43,10 @@ _REDIRECT_CODES = {301, 302, 303, 307, 308}
 
 def _dump_blocked_response(response: httpx.Response) -> Path:
     """Persist a blocked response without serializing request credentials."""
-    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    directory = Path(".flru-debug") / f"blocked-{timestamp}"
-    directory.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
+    root = Path(".flru-debug")
+    root.mkdir(parents=True, exist_ok=True)
+    directory = Path(tempfile.mkdtemp(prefix=f"blocked-{timestamp}-", dir=root))
 
     (directory / "response.html").write_bytes(response.content)
     sensitive_headers = {"authorization", "cookie", "set-cookie", "proxy-authorization"}
@@ -152,12 +154,12 @@ class ResilientTransport:
             total_timeout=self.config.retry.total_timeout,
             max_total_delay=self.config.retry.max_total_delay,
         )
+        proxy_state = await self._proxy_pool.acquire()
+        circuit = await self._circuits.get(self._circuit_key(endpoint, proxy_state.url))
+        await circuit.before_call()
 
         for attempt in range(1, self.config.retry.max_attempts + 1):
             response: httpx.Response | None = None
-            proxy_state = await self._proxy_pool.acquire()
-            circuit = await self._circuits.get(self._circuit_key(endpoint, proxy_state.url))
-            await circuit.before_call()
             timer = Timer()
             await self.metrics.mutate(endpoint=endpoint, requests_total=1)
             await self._emit(
@@ -227,6 +229,7 @@ class ResilientTransport:
             except AuthenticationRequired as exc:
                 await self.metrics.mutate(endpoint=endpoint, failures_total=1)
                 await self._emit_failure(method, url, attempt, endpoint, proxy_state, timer, exc)
+                await circuit.record_success()
                 raise
             except HTTPStatusError as exc:
                 last_error = exc
@@ -235,6 +238,7 @@ class ResilientTransport:
                     await self._emit_failure(
                         method, url, attempt, endpoint, proxy_state, timer, exc
                     )
+                    await circuit.record_success()
                     raise
                 await self._proxy_pool.failure(proxy_state, exc)
             except BlockedError as exc:
@@ -308,17 +312,26 @@ class ResilientTransport:
     ) -> httpx.Response:
         current_method = method
         current_url = url
+        current_headers = dict(headers)
         body_kwargs = dict(kwargs)
         for _ in range(10):
             response = await client.request(
-                current_method, current_url, headers=headers, **body_kwargs
+                current_method, current_url, headers=current_headers, **body_kwargs
             )
             if not self.config.follow_redirects or response.status_code not in _REDIRECT_CODES:
                 return response
             location = response.headers.get("Location")
             if not location:
                 return response
-            current_url = urljoin(str(response.url), location)
+            next_url = urljoin(str(response.url), location)
+            if self._origin(str(response.url)) != self._origin(next_url):
+                sensitive = {"authorization", "cookie", "proxy-authorization"}
+                current_headers = {
+                    key: value
+                    for key, value in current_headers.items()
+                    if key.casefold() not in sensitive
+                }
+            current_url = next_url
             validate_url(current_url, self.config.allowed_hosts, self.config.allow_subdomains)
             if response.status_code == 303 or (
                 response.status_code in {301, 302} and current_method.upper() == "POST"
@@ -328,6 +341,14 @@ class ResilientTransport:
                 body_kwargs.pop("data", None)
                 body_kwargs.pop("json", None)
         raise TransportError(f"Too many redirects for {url}")
+
+    @staticmethod
+    def _origin(url: str) -> tuple[str, str | None, int | None]:
+        parsed = urlsplit(url)
+        port = parsed.port
+        if port is None:
+            port = 443 if parsed.scheme.casefold() == "https" else 80
+        return parsed.scheme.casefold(), parsed.hostname, port
 
     async def emit_event(self, event: RequestEvent) -> None:
         """Emit a sanitized event without allowing handler failures to break requests."""

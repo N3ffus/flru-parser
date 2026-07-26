@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Install uv and Python
@@ -33,14 +33,14 @@ jobs:
         run: uv run flru-canary --pretty | tee canary.json
       - name: Upload result
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: canary-${{ github.run_id }}
           path: canary.json
           if-no-files-found: ignore
       - name: Open or update drift issue
         if: failure()
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const label = "selector-drift";
