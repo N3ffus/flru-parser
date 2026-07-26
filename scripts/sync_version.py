@@ -38,6 +38,13 @@ def synchronized_files() -> dict[Path, str]:
     )
 
     readme_path = ROOT / "README.md"
+    readme_source = readme_path.read_text(encoding="utf-8")
+    readme_source = replace_one(
+        readme_source,
+        r"img\.shields\.io/badge/version-[0-9]+\.[0-9]+\.[0-9]+-blue\.svg",
+        f"img.shields.io/badge/version-{version}-blue.svg",
+        readme_path,
+    )
     release_block = (
         "<!-- release-version:start -->\n"
         "```bash\n"
@@ -47,7 +54,7 @@ def synchronized_files() -> dict[Path, str]:
         "<!-- release-version:end -->"
     )
     readme_text = replace_one(
-        readme_path.read_text(encoding="utf-8"),
+        readme_source,
         r"<!-- release-version:start -->.*?<!-- release-version:end -->",
         release_block,
         readme_path,
