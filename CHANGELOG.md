@@ -4,6 +4,31 @@ All notable changes are documented here. The project follows [Semantic Versionin
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-26
+
+### Security
+
+- Strip credentials merged from default headers and cookie jars on cross-origin redirects.
+- Reject HTTPS-to-HTTP redirects by default and preserve cookie domain/path semantics.
+- Route `robots.txt` through the configured resilient transport.
+- Make blocked-response body dumps opt-in and size-bounded.
+
+### Fixed
+
+- Reject unexplained empty catalog pages instead of silently treating them as pagination end.
+- Detect project-kind selector drift after local filtering and expose filtering diagnostics.
+- Rotate proxy routes after transport failures within one logical request.
+- Enforce retry total timeout as a hard request deadline.
+- Apply shared cooldown to HTTP 429 responses without `Retry-After`.
+- Parse relative dates in the configured timezone and handle year rollover.
+- Ignore duration/counter values following a project budget.
+- Negative-cache failed `robots.txt` requests.
+
+### Added
+
+- Optional `socks` dependency extra.
+- Regression tests for redirect credentials, downgrade redirects, dates, money, and catalog end.
+
 ## [0.4.0] - 2026-07-26
 
 ### Security

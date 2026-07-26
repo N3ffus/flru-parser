@@ -155,7 +155,15 @@ def parse_money(value: str | None) -> Money | None:
         if "€" in raw or "eur" in folded
         else None
     )
-    amounts = [parse_decimal(part) for part in re.findall(r"\d[\d\s\u00a0]*(?:[.,]\d+)?", raw)]
+    # Project cards often append counters and durations after the budget
+    # (for example, a price followed by a two-day duration). Only numbers through the
+    # final currency marker belong to the monetary range.
+    currency_matches = list(re.finditer(r"₽|руб(?:\.|лей|ля)?|\$|usd|€|eur", raw, re.IGNORECASE))
+    amount_text = raw[: currency_matches[-1].end()] if currency_matches else raw
+    amounts = [
+        parse_decimal(part)
+        for part in re.findall(r"\d[\d\s\u00a0]*(?:[.,]\d+)?", amount_text)
+    ]
     numbers = [item for item in amounts if item is not None]
     return Money(
         amount_min=numbers[0] if numbers else None,
@@ -177,8 +185,7 @@ def parse_ru_datetime(
         return None
     zone = ZoneInfo(timezone_name)
     now = now or datetime.now(zone)
-    if now.tzinfo is None:
-        now = now.replace(tzinfo=zone)
+    now = now.astimezone(zone) if now.tzinfo else now.replace(tzinfo=zone)
     folded = text.casefold()
     if folded.startswith("сегодня"):
         time_match = re.search(r"(\d{1,2}):(\d{2})", folded)
@@ -203,7 +210,7 @@ def parse_ru_datetime(
     )
     if absolute and absolute.group("month") in MONTHS_RU:
         try:
-            return datetime(
+            candidate = datetime(
                 int(absolute.group("year") or now.year),
                 MONTHS_RU[absolute.group("month")],
                 int(absolute.group("day")),
@@ -211,6 +218,9 @@ def parse_ru_datetime(
                 int(absolute.group("minute") or 0),
                 tzinfo=zone,
             )
+            if absolute.group("year") is None and candidate - now > timedelta(days=31):
+                candidate = candidate.replace(year=candidate.year - 1)
+            return candidate
         except ValueError:
             return None
     relative = re.search(

@@ -18,6 +18,7 @@ from .exceptions import (
     BlockedError,
     HTTPStatusError,
     RateLimitedError,
+    SecurityError,
     TransportError,
 )
 from .observability import EventHandler, Metrics, RequestEvent, Timer, emit
@@ -41,14 +42,15 @@ _AUTH_MARKERS = (
 _REDIRECT_CODES = {301, 302, 303, 307, 308}
 
 
-def _dump_blocked_response(response: httpx.Response) -> Path:
+def _dump_blocked_response(
+    response: httpx.Response, root: Path, max_bytes: int
+) -> Path:
     """Persist a blocked response without serializing request credentials."""
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
-    root = Path(".flru-debug")
     root.mkdir(parents=True, exist_ok=True)
     directory = Path(tempfile.mkdtemp(prefix=f"blocked-{timestamp}-", dir=root))
 
-    (directory / "response.html").write_bytes(response.content)
+    (directory / "response.html").write_bytes(response.content[:max_bytes])
     sensitive_headers = {"authorization", "cookie", "set-cookie", "proxy-authorization"}
     safe_headers = {
         key: value
@@ -82,7 +84,7 @@ class ResilientTransport:
         self._proxy_pool = ProxyPool(config.proxies)
         self._clients: dict[str | None, httpx.AsyncClient] = {}
         self._client_transport = client_transport
-        self._cookies = dict(config.cookies)
+        self._cookies = httpx.Cookies(dict(config.cookies))
         self._closed = False
 
     @property
@@ -154,11 +156,12 @@ class ResilientTransport:
             total_timeout=self.config.retry.total_timeout,
             max_total_delay=self.config.retry.max_total_delay,
         )
-        proxy_state = await self._proxy_pool.acquire()
-        circuit = await self._circuits.get(self._circuit_key(endpoint, proxy_state.url))
-        await circuit.before_call()
+        failed_routes: set[str | None] = set()
 
         for attempt in range(1, self.config.retry.max_attempts + 1):
+            proxy_state = await self._proxy_pool.acquire(exclude=failed_routes)
+            circuit = await self._circuits.get(self._circuit_key(endpoint, proxy_state.url))
+            await circuit.before_call()
             response: httpx.Response | None = None
             timer = Timer()
             await self.metrics.mutate(endpoint=endpoint, requests_total=1)
@@ -167,14 +170,15 @@ class ResilientTransport:
             )
 
             try:
-                async with self._rate_limiter:
-                    response = await self._request_following_safe_redirects(
-                        self._client(proxy_state.url),
-                        method,
-                        url,
-                        headers=request_headers,
-                        **kwargs,
-                    )
+                async with asyncio.timeout(budget.remaining):
+                    async with self._rate_limiter:
+                        response = await self._request_following_safe_redirects(
+                            self._client(proxy_state.url),
+                            method,
+                            url,
+                            headers=request_headers,
+                            **kwargs,
+                        )
                 elapsed = timer.elapsed
                 await self.metrics.mutate(
                     endpoint=endpoint,
@@ -185,7 +189,17 @@ class ResilientTransport:
                 try:
                     self._detect_block(response)
                 except BlockedError as exc:
-                    debug_directory = _dump_blocked_response(response)
+                    debug_directory = (
+                        _dump_blocked_response(
+                            response,
+                            Path(self.config.blocked_dump_directory),
+                            self.config.blocked_dump_max_bytes,
+                        )
+                        if self.config.blocked_dump_directory
+                        else None
+                    )
+                    if debug_directory is None:
+                        raise
                     raise BlockedError(
                         f"{exc}. Response saved to {debug_directory}",
                         status_code=response.status_code,
@@ -198,8 +212,12 @@ class ResilientTransport:
                     if response.status_code == 429:
                         await self.metrics.mutate(rate_limited_total=1)
                         retry_after = self._retry_after(response)
-                        if retry_after is not None:
-                            await self._rate_limiter.pause_for(retry_after)
+                        cooldown = (
+                            retry_after
+                            if retry_after is not None
+                            else self._retry_delay(attempt, response)
+                        )
+                        await self._rate_limiter.pause_for(cooldown)
                         raise RateLimitedError(429, str(response.url))
                     raise HTTPStatusError(response.status_code, str(response.url))
 
@@ -240,7 +258,9 @@ class ResilientTransport:
                     )
                     await circuit.record_success()
                     raise
-                await self._proxy_pool.failure(proxy_state, exc)
+                # Retries are one logical breaker failure. Release this
+                # attempt's admission without incrementing the counter.
+                await circuit.record_success()
             except BlockedError as exc:
                 await self.metrics.mutate(endpoint=endpoint, blocked_total=1, failures_total=1)
                 await self._proxy_pool.failure(proxy_state, exc)
@@ -262,6 +282,15 @@ class ResilientTransport:
                 last_error = exc
                 await self.metrics.mutate(endpoint=endpoint, failures_total=1)
                 await self._proxy_pool.failure(proxy_state, exc)
+                failed_routes.add(proxy_state.url)
+                await circuit.record_success()
+            except TimeoutError as exc:
+                await circuit.record_failure()
+                await self.metrics.mutate(endpoint=endpoint, failures_total=1)
+                await self._emit_failure(method, url, attempt, endpoint, proxy_state, timer, exc)
+                raise TransportError(
+                    f"Request deadline exhausted after {budget.elapsed:.3f}s: {method} {url}"
+                ) from exc
 
             if attempt >= self.config.retry.max_attempts:
                 await circuit.record_failure()
@@ -314,10 +343,15 @@ class ResilientTransport:
         current_url = url
         current_headers = dict(headers)
         body_kwargs = dict(kwargs)
+        strip_credentials = False
         for _ in range(10):
-            response = await client.request(
+            request = client.build_request(
                 current_method, current_url, headers=current_headers, **body_kwargs
             )
+            if strip_credentials:
+                for name in ("Authorization", "Cookie", "Proxy-Authorization"):
+                    request.headers.pop(name, None)
+            response = await client.send(request)
             if not self.config.follow_redirects or response.status_code not in _REDIRECT_CODES:
                 return response
             location = response.headers.get("Location")
@@ -325,6 +359,13 @@ class ResilientTransport:
                 return response
             next_url = urljoin(str(response.url), location)
             if self._origin(str(response.url)) != self._origin(next_url):
+                if (
+                    response.url.scheme == "https"
+                    and urlsplit(next_url).scheme == "http"
+                    and not self.config.allow_https_to_http_redirects
+                ):
+                    raise SecurityError(f"HTTPS to HTTP redirect is not allowed: {next_url}")
+                strip_credentials = True
                 sensitive = {"authorization", "cookie", "proxy-authorization"}
                 current_headers = {
                     key: value
@@ -340,6 +381,8 @@ class ResilientTransport:
                 body_kwargs.pop("content", None)
                 body_kwargs.pop("data", None)
                 body_kwargs.pop("json", None)
+                for name in ("Content-Length", "Content-Type", "Transfer-Encoding"):
+                    current_headers.pop(name, None)
         raise TransportError(f"Too many redirects for {url}")
 
     @staticmethod
@@ -430,9 +473,20 @@ class ResilientTransport:
             raise AuthenticationRequired(f"Authentication is required for {response.url}")
 
     def _persist_response_cookies(self, response: httpx.Response) -> None:
-        cookies = dict(response.cookies)
-        if cookies:
-            self.update_cookies(cookies)
+        for cookie in response.cookies.jar:
+            self._cookies.set(
+                cookie.name,
+                cookie.value or "",
+                domain=cookie.domain or response.url.host,
+                path=cookie.path or "/",
+            )
+            for client in self._clients.values():
+                client.cookies.set(
+                    cookie.name,
+                    cookie.value or "",
+                    domain=cookie.domain or response.url.host,
+                    path=cookie.path or "/",
+                )
 
     def update_cookies(self, cookies: dict[str, str]) -> None:
         self._cookies.update(cookies)

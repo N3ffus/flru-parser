@@ -71,7 +71,7 @@ from .state import (
     project_content_hash,
 )
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 AsyncClient = Client
 

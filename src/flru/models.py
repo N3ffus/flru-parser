@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-PARSER_VERSION = "0.4.0"
+PARSER_VERSION = "0.5.0"
 SCHEMA_VERSION = "1"
 
 
@@ -36,6 +36,9 @@ class ProjectStatus(StrEnum):
 class ParseDiagnostics(FLModel):
     cards_found: int = 0
     candidate_links_found: int = 0
+    parsed_count: int = 0
+    filtered_count: int = 0
+    unknown_kind_count: int = 0
     selectors_matched: list[str] = Field(default_factory=list)
     missing_required: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

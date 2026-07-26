@@ -52,7 +52,7 @@ class ProxyConfig:
     strategy: Literal["round_robin", "random"] = "round_robin"
     max_failures: int = 3
     cooldown: float = 120.0
-    direct_fallback: bool = True
+    direct_fallback: bool = False
 
 
 @dataclass(slots=True, frozen=True)
@@ -76,6 +76,7 @@ class ClientConfig:
     user_agents: tuple[str, ...] = DEFAULT_USER_AGENTS
     rotate_user_agents: bool = True
     follow_redirects: bool = True
+    allow_https_to_http_redirects: bool = False
     verify_ssl: bool = True
     http2: bool = True
     max_connections: int = 100
@@ -87,6 +88,8 @@ class ClientConfig:
     store_raw_html: bool = False
     store_failed_html: bool = False
     failed_html_directory: str | None = None
+    blocked_dump_directory: str | None = None
+    blocked_dump_max_bytes: int = 1_000_000
     detect_blocks: bool = True
     allowed_hosts: frozenset[str] = frozenset({"fl.ru", "www.fl.ru"})
     allow_subdomains: bool = True
@@ -107,6 +110,8 @@ class ClientConfig:
             raise ConfigurationError("max_attempts must be positive")
         if self.retry.total_timeout <= 0:
             raise ConfigurationError("total_timeout must be positive")
+        if self.blocked_dump_max_bytes <= 0:
+            raise ConfigurationError("blocked_dump_max_bytes must be positive")
         if not self.user_agents:
             raise ConfigurationError("at least one user agent is required")
         if not host or not any(

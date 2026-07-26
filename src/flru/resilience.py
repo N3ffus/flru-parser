@@ -150,6 +150,10 @@ class RetryBudget:
     def elapsed(self) -> float:
         return monotonic() - self.started_at
 
+    @property
+    def remaining(self) -> float:
+        return max(0.0, self.total_timeout - self.elapsed)
+
     def allows(self, delay: float = 0.0) -> bool:
         return (
             self.elapsed + delay <= self.total_timeout
