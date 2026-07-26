@@ -71,7 +71,9 @@ async def test_block_auth_status_and_event_handler_failure(tmp_path, monkeypatch
         raise RuntimeError("event failed")
 
     async with FLClient(
-        config(), transport=httpx.MockTransport(handler), event_handler=broken_event
+        config(blocked_dump_directory=".flru-debug"),
+        transport=httpx.MockTransport(handler),
+        event_handler=broken_event,
     ) as client:
         with pytest.raises(BlockedError) as blocked:
             await client.get_html("/blocked")
@@ -203,6 +205,51 @@ async def test_cross_origin_redirect_strips_explicit_credentials() -> None:
     assert "authorization" not in seen
     assert "proxy-authorization" not in seen
     assert seen["x-safe"] == "yes"
+
+
+@pytest.mark.asyncio
+async def test_cross_origin_redirect_strips_default_credentials_and_cookie_jar() -> None:
+    seen: httpx.Headers | None = None
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal seen
+        if request.url.host == "www.fl.ru":
+            return httpx.Response(
+                302,
+                headers={
+                    "Location": "https://st.fl.ru/final",
+                    "Set-Cookie": "server=secret; Domain=.fl.ru; Path=/",
+                },
+                request=request,
+            )
+        seen = request.headers
+        return httpx.Response(200, text="ok", request=request)
+
+    async with FLClient(
+        config(
+            headers={"Authorization": "Bearer default"},
+            cookies={"configured": "secret"},
+        ),
+        transport=httpx.MockTransport(handler),
+    ) as client:
+        await client.get_html("/start")
+
+    assert seen is not None
+    assert "authorization" not in seen
+    assert "cookie" not in seen
+    assert "proxy-authorization" not in seen
+
+
+@pytest.mark.asyncio
+async def test_https_to_http_redirect_is_rejected() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            302, headers={"Location": "http://www.fl.ru/final"}, request=request
+        )
+
+    async with FLClient(config(), transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(SecurityError, match="HTTPS to HTTP"):
+            await client.get_html("/start")
 
 
 @pytest.mark.asyncio

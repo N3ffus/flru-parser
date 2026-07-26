@@ -33,6 +33,23 @@ def test_common_edge_cases() -> None:
     assert parse_ru_datetime("31 февраля 2026", now=now) is None
 
 
+def test_relative_dates_use_parser_timezone_and_roll_year_back() -> None:
+    utc_now = datetime(2026, 1, 1, 21, 30, tzinfo=ZoneInfo("UTC"))
+    today = parse_ru_datetime("сегодня 00:15", now=utc_now)
+    yesterday = parse_ru_datetime("вчера 23:59", now=utc_now)
+    previous_year = parse_ru_datetime("31 декабря", now=datetime(2026, 1, 2, tzinfo=ZoneInfo("UTC")))
+
+    assert today == datetime(2026, 1, 2, 0, 15, tzinfo=ZoneInfo("Europe/Moscow"))
+    assert yesterday == datetime(2026, 1, 1, 23, 59, tzinfo=ZoneInfo("Europe/Moscow"))
+    assert previous_year == datetime(2025, 12, 31, tzinfo=ZoneInfo("Europe/Moscow"))
+
+
+def test_money_ignores_duration_after_currency() -> None:
+    money = parse_money("10 000 руб. Срок: 2 дня, ответов: 7")
+    assert money is not None
+    assert money.amount_min == money.amount_max == 10_000
+
+
 def test_project_diagnostics() -> None:
     html = (Path(__file__).parent / "fixtures" / "projects.html").read_text(encoding="utf-8")
     page = parse_project_list(html, "https://www.fl.ru/projects/")
@@ -45,6 +62,11 @@ def test_project_diagnostics() -> None:
         "<html><main>Нет проектов</main></html>", "https://www.fl.ru/projects/?page=2", page=2
     )
     assert "catalog_end" in end.diagnostics.warnings
+
+    unexplained = parse_project_list(
+        "<html><main></main></html>", "https://www.fl.ru/projects/?page=2", page=2
+    )
+    assert "catalog_end" not in unexplained.diagnostics.warnings
 
 
 @pytest.mark.parametrize(

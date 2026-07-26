@@ -36,21 +36,30 @@ class ProxyPool:
         self._index = 0
         self._lock = asyncio.Lock()
 
-    async def acquire(self) -> ProxyState:
+    async def acquire(self, *, exclude: set[str | None] | None = None) -> ProxyState:
+        excluded = exclude or set()
         while True:
             async with self._lock:
-                available = [state for state in self._states if state.available]
+                available = [
+                    state for state in self._states if state.available and state.url not in excluded
+                ]
                 if available:
                     if self._config.strategy == "random":
                         return random.choice(available)
                     for _ in range(len(self._states)):
                         state = self._states[self._index % len(self._states)]
                         self._index += 1
-                        if state.available:
+                        if state.available and state.url not in excluded:
                             return state
                     return available[0]
-                if not self._states or self._config.direct_fallback:
+                if (not self._states or self._config.direct_fallback) and None not in excluded:
                     return self._direct
+                # A logical request may have exhausted every route. Permit a
+                # later retry to reuse a healthy route instead of waiting for
+                # a cooldown that was never set.
+                reusable = [state for state in self._states if state.available]
+                if reusable:
+                    return reusable[0]
                 wait = max(
                     0.01,
                     min(state.cooldown_until for state in self._states) - monotonic(),

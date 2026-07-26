@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from time import monotonic
 from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
-
-import httpx
 
 
 class RobotsPolicy:
@@ -14,16 +13,14 @@ class RobotsPolicy:
         *,
         base_url: str,
         user_agent: str,
-        timeout: httpx.Timeout,
-        verify: bool,
+        fetch_text: Callable[[str], Awaitable[str]],
         cache_ttl: float,
         fail_closed: bool,
     ) -> None:
         parts = urlsplit(base_url)
         self._robots_url = f"{parts.scheme}://{parts.netloc}/robots.txt"
         self._user_agent = user_agent
-        self._timeout = timeout
-        self._verify = verify
+        self._fetch_text = fetch_text
         self._cache_ttl = cache_ttl
         self._fail_closed = fail_closed
         self._parser: RobotFileParser | None = None
@@ -39,24 +36,18 @@ class RobotsPolicy:
         )
 
     async def _get_parser(self) -> RobotFileParser | None:
-        if self._parser is not None and monotonic() - self._loaded_at < self._cache_ttl:
+        if self._loaded_at and monotonic() - self._loaded_at < self._cache_ttl:
             return self._parser
         async with self._lock:
-            if self._parser is not None and monotonic() - self._loaded_at < self._cache_ttl:
+            if self._loaded_at and monotonic() - self._loaded_at < self._cache_ttl:
                 return self._parser
             try:
-                async with httpx.AsyncClient(
-                    timeout=self._timeout, verify=self._verify, follow_redirects=True
-                ) as client:
-                    response = await client.get(
-                        self._robots_url, headers={"User-Agent": self._user_agent}
-                    )
-                    response.raise_for_status()
+                text = await self._fetch_text(self._robots_url)
                 parser = RobotFileParser()
                 parser.set_url(self._robots_url)
-                parser.parse(response.text.splitlines())
+                parser.parse(text.splitlines())
                 self._parser, self._loaded_at = parser, monotonic()
                 return parser
-            except (httpx.HTTPError, ValueError):
+            except Exception:
                 self._loaded_at = monotonic()
                 return None

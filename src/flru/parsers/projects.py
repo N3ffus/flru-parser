@@ -229,12 +229,9 @@ def parse_project_list(
     if (
         not items
         and not next_url
-        and (
-            page > 1
-            or any(
-                marker in lower_text
-                for marker in ("ничего не найдено", "нет проектов", "заказов не найдено")
-            )
+        and any(
+            marker in lower_text
+            for marker in ("ничего не найдено", "нет проектов", "заказов не найдено")
         )
     ):
         warnings.append("catalog_end")
@@ -243,6 +240,7 @@ def parse_project_list(
     diagnostics = ParseDiagnostics(
         cards_found=len({id(_find_card(anchor)) for anchor in anchors}),
         candidate_links_found=len(anchors),
+        parsed_count=len(items),
         selectors_matched=[root_selector],
         missing_required=missing,
         warnings=warnings,

@@ -89,17 +89,10 @@ class FLClient:
             event_handler=event_handler,
             client_transport=transport,
         )
-        timeout = httpx.Timeout(
-            connect=self.config.timeout.connect,
-            read=self.config.timeout.read,
-            write=self.config.timeout.write,
-            pool=self.config.timeout.pool,
-        )
         self._robots = RobotsPolicy(
             base_url=self.config.base_url,
             user_agent=self.config.user_agents[0],
-            timeout=timeout,
-            verify=self.config.verify_ssl,
+            fetch_text=self._fetch_robots_text,
             cache_ttl=self.config.robots_cache_ttl,
             fail_closed=self.config.robots_fail_closed,
         )
@@ -152,6 +145,12 @@ class FLClient:
             raise RobotsDeniedError(f"robots.txt denies access to {absolute}")
         return await self._transport.request(method, absolute, **kwargs)
 
+    async def _fetch_robots_text(self, url: str) -> str:
+        response = await self._transport.request(
+            "GET", url, headers={"User-Agent": self.config.user_agents[0]}
+        )
+        return response.text
+
     async def _get_document(
         self,
         url: str,
@@ -199,15 +198,8 @@ class FLClient:
                 fetched_at=fetched_at,
                 timezone_name=self.config.parser_timezone,
             )
+            self._apply_project_filters(result, filters)
             self._validate_project_page(result)
-            if filters and filters.project_types:
-                kind_map = {
-                    ProjectType.ORDER: ProjectKind.ORDER,
-                    ProjectType.VACANCY: ProjectKind.VACANCY,
-                    ProjectType.CONTEST: ProjectKind.CONTEST,
-                }
-                requested = {kind_map[item] for item in filters.project_types}
-                result.items = [item for item in result.items if item.kind in requested]
             return result
         except ParseError as exc:
             await self._record_parse_failure(effective_url, html, exc)
@@ -344,16 +336,6 @@ class FLClient:
         fail_fast: bool = True,
     ) -> AsyncIterator[ProjectSummary]:
         seen: set[int] = set()
-        allowed_kinds = {
-            ProjectType.ORDER: ProjectKind.ORDER,
-            ProjectType.VACANCY: ProjectKind.VACANCY,
-            ProjectType.CONTEST: ProjectKind.CONTEST,
-        }
-        requested_kinds = (
-            {allowed_kinds[item] for item in filters.project_types}
-            if filters and filters.project_types
-            else set()
-        )
         async for page in self.iter_project_pages(
             start_page=start_page,
             max_pages=max_pages,
@@ -363,12 +345,9 @@ class FLClient:
             params=params,
             fail_fast=fail_fast,
         ):
+            # Keep iterator semantics consistent even for custom page providers.
+            self._apply_project_filters(page, filters)
             for item in page.items:
-                # FL.ru can include pinned cards of another kind even when a
-                # `kind` filter is present, so enforce the requested kinds
-                # locally as well.
-                if requested_kinds and item.kind not in requested_kinds:
-                    continue
                 if deduplicate and item.id in seen:
                     continue
                 seen.add(item.id)
@@ -790,6 +769,32 @@ class FLClient:
             )
         return result
 
+    def _apply_project_filters(
+        self, page: ProjectPage, filters: ProjectFilters | None
+    ) -> None:
+        diagnostics = page.diagnostics
+        diagnostics.parsed_count = len(page.items)
+        diagnostics.unknown_kind_count = sum(
+            item.kind is ProjectKind.UNKNOWN for item in page.items
+        )
+        if not filters or not filters.project_types:
+            diagnostics.filtered_count = len(page.items)
+            return
+        kind_map = {
+            ProjectType.ORDER: ProjectKind.ORDER,
+            ProjectType.VACANCY: ProjectKind.VACANCY,
+            ProjectType.CONTEST: ProjectKind.CONTEST,
+        }
+        requested = {kind_map[item] for item in filters.project_types}
+        if page.items and diagnostics.unknown_kind_count == len(page.items):
+            raise SelectorDriftError(
+                f"All {len(page.items)} project cards have an unknown kind at {page.url}"
+            )
+        page.items = [item for item in page.items if item.kind in requested]
+        diagnostics.filtered_count = len(page.items)
+        if diagnostics.parsed_count and not page.items:
+            diagnostics.warnings.append("filtered_empty")
+
     def _validate_project_page(self, page: ProjectPage) -> None:
         if not self.config.strict_parsing or page.items:
             return
@@ -798,7 +803,7 @@ class FLClient:
             raise SelectorDriftError(
                 f"Found {diagnostics.candidate_links_found} project links but parsed no items at {page.url}"
             )
-        if "catalog_end" not in diagnostics.warnings:
+        if not {"catalog_end", "filtered_empty"}.intersection(diagnostics.warnings):
             raise EmptyPageError(f"Unexpected empty project page: {page.url}")
 
     async def _record_parse_failure(
