@@ -6,6 +6,7 @@ runs publish to TestPyPI only. Never move or force-update an existing release ta
 Before tagging, merge the release pull request, verify CI on the merge commit, and run:
 
 ```bash
+uv run python scripts/sync_version.py
 uv run python scripts/check_release.py --tag vX.Y.Z
 uv build
 uvx twine check dist/*

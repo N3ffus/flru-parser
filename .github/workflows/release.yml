@@ -32,6 +32,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
         run: |
+          python scripts/sync_version.py --check
           if [ -n "$RELEASE_TAG" ]; then
             python scripts/check_release.py --tag "$RELEASE_TAG"
           else

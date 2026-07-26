@@ -39,11 +39,25 @@ def main() -> None:
         fail("src/flru/__init__.py has no literal __version__")
     if match.group(1) != project_version:
         fail(f"version mismatch: pyproject={project_version}, __version__={match.group(1)}")
+    models_text = (ROOT / "src/flru/models.py").read_text(encoding="utf-8")
+    parser_match = re.search(r'^PARSER_VERSION = "([^"]+)"$', models_text, re.MULTILINE)
+    if not parser_match or parser_match.group(1) != project_version:
+        fail(
+            "version mismatch: "
+            f"pyproject={project_version}, "
+            f"parser={parser_match.group(1) if parser_match else 'missing'}"
+        )
 
     if args.tag and args.tag.removeprefix("v") != project_version:
         fail(f"tag/version mismatch: tag={args.tag}, package={project_version}")
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    readme_release_commands = (
+        f'git tag -a v{project_version} -m "flru-parser {project_version}"',
+        f"git push origin main v{project_version}",
+    )
+    if not all(command in readme for command in readme_release_commands):
+        fail("README release commands are not synchronized with the package version")
     if "OWNER" in pyproject_text + readme and not args.allow_placeholder:
         fail("replace OWNER first: uv run python scripts/configure_project.py YOUR_GITHUB_USERNAME")
     if f"## [{project_version}]" not in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"):
