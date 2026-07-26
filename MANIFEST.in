@@ -8,10 +8,10 @@ include SUPPORT.md
 include pyproject.toml
 recursive-include docs *.md
 recursive-include examples *.py *.md
-recursive-include tests *.py *.html
 recursive-include src/flru py.typed
 prune .github
 prune scripts
+prune tests
 exclude .coverage
 exclude coverage.json
 exclude coverage.xml

@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 import httpx
 from bs4 import BeautifulSoup
 
-from .batch import BatchError, BatchResult
+from .batch import BatchError, BatchResult, StreamItemResult
 from .config import ClientConfig
 from .cookies import load_netscape_cookies
 from .exceptions import (
@@ -386,7 +386,12 @@ class FLClient:
         checkpoint = await state.get_checkpoint(namespace) if resume else None
         if checkpoint and checkpoint.next_page and "start_page" not in kwargs:
             kwargs["start_page"] = checkpoint.next_page
-        consecutive_known = checkpoint.consecutive_known if checkpoint else 0
+        resumed_from_checkpoint = bool(
+            checkpoint and (checkpoint.next_page is not None or checkpoint.next_url is not None)
+        )
+        consecutive_known = (
+            checkpoint.consecutive_known if checkpoint and resumed_from_checkpoint else 0
+        )
         async for page in self.iter_project_pages(**kwargs):
             records = []
             for project in page.items:
@@ -432,42 +437,84 @@ class FLClient:
         queue_size: int = 50,
         fail_fast: bool = True,
     ) -> AsyncIterator[ProjectDetail]:
-        """Bounded producer/worker pipeline with backpressure."""
+        """Yield successful details from the result stream."""
+        async for result in self.iter_project_details_result(
+            projects,
+            workers=workers,
+            queue_size=queue_size,
+        ):
+            if result.error is None:
+                assert result.value is not None
+                yield result.value
+            elif isinstance(result.error, BlockedError) or fail_fast:
+                raise result.error
+
+    async def iter_project_details_result(
+        self,
+        projects: AsyncIterator[ProjectSummary] | Iterable[ProjectSummary],
+        *,
+        workers: int = 4,
+        queue_size: int = 50,
+    ) -> AsyncIterator[StreamItemResult[int, ProjectDetail]]:
+        """Bounded structured pipeline that exposes per-item failures."""
+        if workers <= 0:
+            raise ValueError("workers must be greater than zero")
+        if queue_size <= 0:
+            raise ValueError("queue_size must be greater than zero")
+
         input_queue: asyncio.Queue[ProjectSummary | None] = asyncio.Queue(queue_size)
-        output_queue: asyncio.Queue[ProjectDetail | Exception | None] = asyncio.Queue(queue_size)
+        output_queue: asyncio.Queue[StreamItemResult[int, ProjectDetail] | BaseException | None] = (
+            asyncio.Queue(queue_size)
+        )
 
         async def producer() -> None:
-            if isinstance(projects, AsyncIterable):
-                async for item in projects:
-                    await input_queue.put(item)
-            else:
-                for item in projects:
-                    await input_queue.put(item)
-            for _ in range(workers):
-                await input_queue.put(None)
+            try:
+                if isinstance(projects, AsyncIterable):
+                    async for item in projects:
+                        await input_queue.put(item)
+                else:
+                    for item in projects:
+                        await input_queue.put(item)
+            except Exception as exc:
+                await output_queue.put(exc)
+            finally:
+                task = asyncio.current_task()
+                if isinstance(projects, AsyncIterable):
+                    close = getattr(projects, "aclose", None)
+                    if close is not None:
+                        await close()
+                if task is None or not task.cancelling():
+                    for _ in range(workers):
+                        await input_queue.put(None)
 
         async def worker() -> None:
             while (item := await input_queue.get()) is not None:
                 try:
-                    await output_queue.put(await self.get_project(item.url))
-                except Exception as exc:
+                    value = await self.get_project(item.url)
+                    await output_queue.put(StreamItemResult(key=item.id, value=value))
+                except BlockedError as exc:
                     await output_queue.put(exc)
+                    return
+                except Exception as exc:
+                    await output_queue.put(StreamItemResult(key=item.id, error=exc))
                 finally:
                     input_queue.task_done()
             input_queue.task_done()
             await output_queue.put(None)
 
-        tasks = [asyncio.create_task(producer())]
-        tasks.extend(asyncio.create_task(worker()) for _ in range(workers))
+        tasks = [asyncio.create_task(producer(), name="flru-project-producer")]
+        tasks.extend(
+            asyncio.create_task(worker(), name=f"flru-project-worker-{index}")
+            for index in range(workers)
+        )
         finished = 0
         try:
             while finished < workers:
                 value = await output_queue.get()
                 if value is None:
                     finished += 1
-                elif isinstance(value, Exception):
-                    if fail_fast:
-                        raise value
+                elif isinstance(value, BaseException):
+                    raise value
                 else:
                     yield value
         finally:

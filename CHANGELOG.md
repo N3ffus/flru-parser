@@ -4,6 +4,46 @@ All notable changes are documented here. The project follows [Semantic Versionin
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-26
+
+### Security
+
+- Strip explicit authorization, cookie, and proxy authorization headers on cross-origin
+  redirects.
+- Pin release and CI GitHub Actions to immutable commit SHAs.
+- Restrict manual publishing to TestPyPI; production publishing requires a release tag.
+
+### Fixed
+
+- Admit one logical request to the circuit breaker only once across its retry cycle.
+- Guarantee bounded streaming pipeline shutdown after producer errors, cancellation, blocked
+  responses, and early consumer exit.
+- Use direct access only after configured proxies are unavailable.
+- Reset legacy incremental known-item streaks when no resumable page is present.
+- Create collision-resistant blocked-response diagnostic directories.
+
+### Added
+
+- `StreamItemResult` and `FLClient.iter_project_details_result()` for observable per-item
+  streaming failures.
+- Multi-surface live canary checks and structural HTML fingerprints.
+- Distribution size and documentation example checks.
+- Release operator guidance in `docs/RELEASING.md`.
+
+### Changed
+
+- Production source distributions no longer bundle the test fixture corpus.
+- Content fingerprint behavior is now explicitly named and documented.
+
+### Testing
+
+- Added regression coverage for streaming lifecycle, half-open recovery, proxy fallback, and
+  redirect credential handling.
+
+### Compatibility
+
+- Existing imports and `iter_project_details()` behavior remain available; changes are additive.
+
 ## [0.3.2] - 2026-07-26
 
 ### Fixed

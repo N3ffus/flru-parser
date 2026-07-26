@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flru-parser"
-version = "0.3.2"
+version = "0.4.0"
 description = "Simple, typed and resilient async/sync parser client for public FL.ru pages"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -89,11 +89,6 @@ filterwarnings = ["error"]
 source = ["flru"]
 branch = true
 parallel = true
-omit = [
-  "src/flru/canary.py",
-  "src/flru/sync.py",
-  "src/flru/integrations/*",
-]
 
 [tool.coverage.report]
 show_missing = true
@@ -104,8 +99,6 @@ exclude_also = [
   "if __name__ == .__main__.:",
   "raise NotImplementedError",
   "@overload",
-  "class PostgresStateStore",
-  "class RedisStateStore",
 ]
 
 [tool.coverage.html]

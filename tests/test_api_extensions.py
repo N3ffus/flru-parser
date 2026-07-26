@@ -184,6 +184,40 @@ async def test_incremental_state_and_sqlite(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_sqlite_reads_legacy_payload_and_rejects_future_version(tmp_path: Path) -> None:
+    import json
+    import sqlite3
+    from contextlib import closing
+
+    from flru import StateDataError, UnsupportedStateVersionError
+
+    project = ProjectSummary(id=7, title="Seven", url="https://www.fl.ru/projects/7/x.html")
+    record = record_for(project)
+    database = tmp_path / "legacy.db"
+    store = SQLiteStateStore(database)
+    await store.save(record)
+    with closing(sqlite3.connect(database)) as connection, connection:
+        connection.execute(
+            "UPDATE projects SET payload=? WHERE project_id=7",
+            (record.model_dump_json(),),
+        )
+    assert (await store.get(7)).project.title == "Seven"
+
+    with closing(sqlite3.connect(database)) as connection, connection:
+        connection.execute(
+            "UPDATE projects SET payload=? WHERE project_id=7",
+            (json.dumps({"payload_version": 999, "payload": {}}),),
+        )
+    with pytest.raises(UnsupportedStateVersionError):
+        await store.get(7)
+
+    with closing(sqlite3.connect(database)) as connection, connection:
+        connection.execute("UPDATE projects SET payload=? WHERE project_id=7", ("{",))
+    with pytest.raises(StateDataError):
+        await store.get(7)
+
+
+@pytest.mark.asyncio
 async def test_iter_new_projects_persists_and_stops() -> None:
     transport = httpx.MockTransport(router)
     state = MemoryStateStore()

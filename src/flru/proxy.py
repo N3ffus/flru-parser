@@ -30,10 +30,8 @@ class ProxyPool:
     """Health-aware proxy selector. A ``None`` URL represents direct access."""
 
     def __init__(self, config: ProxyConfig) -> None:
-        states = [ProxyState(url=url) for url in config.urls]
-        if config.direct_fallback or not states:
-            states.append(ProxyState(url=None))
-        self._states = states
+        self._states = [ProxyState(url=url) for url in config.urls]
+        self._direct = ProxyState(url=None)
         self._config = config
         self._index = 0
         self._lock = asyncio.Lock()
@@ -51,6 +49,8 @@ class ProxyPool:
                         if state.available:
                             return state
                     return available[0]
+                if not self._states or self._config.direct_fallback:
+                    return self._direct
                 wait = max(
                     0.01,
                     min(state.cooldown_until for state in self._states) - monotonic(),
@@ -75,6 +75,9 @@ class ProxyPool:
 
     async def snapshot(self) -> list[ProxyState]:
         async with self._lock:
+            states = [*self._states]
+            if self._config.direct_fallback or not states:
+                states.append(self._direct)
             return [
                 ProxyState(
                     url=state.safe_url,
@@ -83,5 +86,5 @@ class ProxyPool:
                     cooldown_until=state.cooldown_until,
                     last_error=state.last_error,
                 )
-                for state in self._states
+                for state in states
             ]

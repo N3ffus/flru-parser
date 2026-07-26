@@ -208,6 +208,9 @@ async with Client(
 
 `cookies` can be a mapping or a Netscape-format browser export path.
 Proxy credentials are redacted from metrics and events.
+When `direct_fallback=True`, direct access is used only while every configured proxy is
+unavailable. This can change the apparent client IP and should be enabled only when that
+privacy trade-off is acceptable.
 
 ### Models
 

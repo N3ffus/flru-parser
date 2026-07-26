@@ -18,7 +18,7 @@ jobs:
     name: Quality / Python 3.13
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Install uv and Python
@@ -45,7 +45,7 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Install uv and Python
@@ -65,7 +65,7 @@ jobs:
           --cov-report=html
       - name: Upload coverage report
         if: matrix.python-version == '3.13'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: coverage-report
           path: |
@@ -76,7 +76,7 @@ jobs:
     name: Build and inspect distributions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Install uv and Python
@@ -92,13 +92,15 @@ jobs:
         run: |
           uvx check-wheel-contents dist/*.whl
           unzip -l dist/*.whl
+          tar -tzf dist/*.tar.gz
+          uv run python scripts/check_dist_size.py dist
       - name: Smoke-install wheel
         run: |
           uv venv .smoke
           uv pip install --python .smoke/bin/python dist/*.whl
           .smoke/bin/python -c "import flru; print(flru.__version__)"
       - name: Upload distributions
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: python-package-distributions
           path: dist/
