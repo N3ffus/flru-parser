@@ -161,8 +161,7 @@ def parse_money(value: str | None) -> Money | None:
     currency_matches = list(re.finditer(r"₽|руб(?:\.|лей|ля)?|\$|usd|€|eur", raw, re.IGNORECASE))
     amount_text = raw[: currency_matches[-1].end()] if currency_matches else raw
     amounts = [
-        parse_decimal(part)
-        for part in re.findall(r"\d[\d\s\u00a0]*(?:[.,]\d+)?", amount_text)
+        parse_decimal(part) for part in re.findall(r"\d[\d\s\u00a0]*(?:[.,]\d+)?", amount_text)
     ]
     numbers = [item for item in amounts if item is not None]
     return Money(

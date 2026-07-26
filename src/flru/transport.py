@@ -42,9 +42,7 @@ _AUTH_MARKERS = (
 _REDIRECT_CODES = {301, 302, 303, 307, 308}
 
 
-def _dump_blocked_response(
-    response: httpx.Response, root: Path, max_bytes: int
-) -> Path:
+def _dump_blocked_response(response: httpx.Response, root: Path, max_bytes: int) -> Path:
     """Persist a blocked response without serializing request credentials."""
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
     root.mkdir(parents=True, exist_ok=True)

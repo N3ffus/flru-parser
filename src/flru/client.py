@@ -769,9 +769,7 @@ class FLClient:
             )
         return result
 
-    def _apply_project_filters(
-        self, page: ProjectPage, filters: ProjectFilters | None
-    ) -> None:
+    def _apply_project_filters(self, page: ProjectPage, filters: ProjectFilters | None) -> None:
         diagnostics = page.diagnostics
         diagnostics.parsed_count = len(page.items)
         diagnostics.unknown_kind_count = sum(

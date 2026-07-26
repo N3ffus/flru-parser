@@ -37,7 +37,9 @@ def test_relative_dates_use_parser_timezone_and_roll_year_back() -> None:
     utc_now = datetime(2026, 1, 1, 21, 30, tzinfo=ZoneInfo("UTC"))
     today = parse_ru_datetime("сегодня 00:15", now=utc_now)
     yesterday = parse_ru_datetime("вчера 23:59", now=utc_now)
-    previous_year = parse_ru_datetime("31 декабря", now=datetime(2026, 1, 2, tzinfo=ZoneInfo("UTC")))
+    previous_year = parse_ru_datetime(
+        "31 декабря", now=datetime(2026, 1, 2, tzinfo=ZoneInfo("UTC"))
+    )
 
     assert today == datetime(2026, 1, 2, 0, 15, tzinfo=ZoneInfo("Europe/Moscow"))
     assert yesterday == datetime(2026, 1, 1, 23, 59, tzinfo=ZoneInfo("Europe/Moscow"))

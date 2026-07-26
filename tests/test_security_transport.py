@@ -243,9 +243,7 @@ async def test_cross_origin_redirect_strips_default_credentials_and_cookie_jar()
 @pytest.mark.asyncio
 async def test_https_to_http_redirect_is_rejected() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            302, headers={"Location": "http://www.fl.ru/final"}, request=request
-        )
+        return httpx.Response(302, headers={"Location": "http://www.fl.ru/final"}, request=request)
 
     async with FLClient(config(), transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(SecurityError, match="HTTPS to HTTP"):
