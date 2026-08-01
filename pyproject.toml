@@ -36,7 +36,7 @@ classifiers = [
 [project.optional-dependencies]
 socks = ["httpx[socks]>=0.28,<1"]
 postgres = ["asyncpg>=0.30,<1"]
-redis = ["redis>=5.2,<8"]
+redis = ["redis>=5.2,<9"]
 observability = [
   "opentelemetry-api>=1.29,<2",
   "opentelemetry-sdk>=1.29,<2",
@@ -54,7 +54,7 @@ dev = [
   "pytest-cov>=7,<8",
   "respx>=0.22,<1",
   "ruff>=0.16,<1",
-  "twine>=6.2,<7",
+  "twine>=6.2,<8",
   "types-beautifulsoup4>=4.12,<5",
 ]
 
